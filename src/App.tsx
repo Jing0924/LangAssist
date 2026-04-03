@@ -3,19 +3,30 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { isAbortError } from './abortError'
 import {
   blobToBase64,
+  detectLanguage,
   recognizeSpeech,
+  speechLanguageCode,
   translateText,
 } from './api'
 import { useMagnetic } from './hooks/useMagnetic'
 import { useTtsPlayback } from './hooks/useTtsPlayback'
 import { useTypewriter } from './hooks/useTypewriter'
 import { useVoiceRecorder, VIZ_BAR_COUNT } from './hooks/useVoiceRecorder'
-import { LANGUAGES, languageLabel } from './languages'
+import {
+  LANGUAGES,
+  PAIR_LANGUAGES,
+  applyBidirectionalKanaJaHint,
+  languageLabel,
+  normalizeGoogleLangToAppCode,
+  resolveBidirectionalTranslatePair,
+} from './languages'
 import './App.css'
 
 type ProcessingStep = 'recognizing' | 'translating' | 'speaking'
 
 type UiPhase = 'idle' | 'listening' | ProcessingStep
+
+type TranslateMode = 'oneWay' | 'bidirectional'
 
 function derivePhase(
   recording: boolean,
@@ -69,8 +80,14 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [processingStep, setProcessingStep] =
     useState<ProcessingStep>('recognizing')
+  const [translateMode, setTranslateMode] =
+    useState<TranslateMode>('oneWay')
   const [sourceLang, setSourceLang] = useState<string>('auto')
   const [targetLang, setTargetLang] = useState<string>('en')
+  const [pairLangA, setPairLangA] = useState<string>('zh-TW')
+  const [pairLangB, setPairLangB] = useState<string>('ja')
+  const [lastDetectedLang, setLastDetectedLang] = useState<string>('')
+  const [lastTargetLang, setLastTargetLang] = useState<string>('')
   const [sourceText, setSourceText] = useState('')
   const [translatedText, setTranslatedText] = useState('')
   const [hint, setHint] = useState<string | null>(null)
@@ -105,18 +122,45 @@ export default function App() {
     }
   }, [abortPipeline])
 
+  useEffect(() => {
+    setLastDetectedLang('')
+    setLastTargetLang('')
+  }, [translateMode])
+
   const startRecording = useCallback(async () => {
     await armRecorder()
     setRecording(true)
   }, [armRecorder])
 
   const swapLanguages = useCallback(() => {
+    if (translateMode === 'bidirectional') {
+      const a = pairLangA
+      setPairLangA(pairLangB)
+      setPairLangB(a)
+      return
+    }
     if (sourceLang === 'auto') return
     const s = sourceLang
     const t = targetLang
     setSourceLang(t)
     setTargetLang(s)
-  }, [sourceLang, targetLang])
+  }, [translateMode, pairLangA, pairLangB, sourceLang, targetLang])
+
+  const setPairA = useCallback((code: string) => {
+    setPairLangA(code)
+    if (code === pairLangB) {
+      const pick = PAIR_LANGUAGES.find((l) => l.code !== code)
+      if (pick) setPairLangB(pick.code)
+    }
+  }, [pairLangB])
+
+  const setPairB = useCallback((code: string) => {
+    setPairLangB(code)
+    if (code === pairLangA) {
+      const pick = PAIR_LANGUAGES.find((l) => l.code !== code)
+      if (pick) setPairLangA(pick.code)
+    }
+  }, [pairLangA])
 
   const onMicClick = useCallback(async () => {
     if (busy) return
@@ -136,31 +180,101 @@ export default function App() {
         }
         const b64 = await blobToBase64(blob)
         setProcessingStep('recognizing')
-        const transcript = await recognizeSpeech(
-          b64,
-          blob.type || 'audio/webm',
-          sourceLang,
-          signal,
-        )
-        if (!transcript.trim()) {
-          setHint('辨識結果為空，請靠近麥克風或說大聲一點。')
-          setSourceText('（無辨識內容）')
-          setTranslatedText('')
-          return
+
+        let transcript: string
+        let effectiveSource: string
+        let effectiveTarget: string
+
+        if (translateMode === 'bidirectional') {
+          const primary = pairLangA
+          const altCode = speechLanguageCode(pairLangB)
+          const { transcript: tr, detectedSpeechLanguage } =
+            await recognizeSpeech(
+              b64,
+              blob.type || 'audio/webm',
+              primary,
+              signal,
+              { alternativeLanguageCodes: [altCode] },
+            )
+          transcript = tr
+
+          if (!transcript.trim()) {
+            setHint('辨識結果為空，請靠近麥克風或說大聲一點。')
+            setSourceText('（無辨識內容）')
+            setTranslatedText('')
+            setLastDetectedLang('')
+            setLastTargetLang('')
+            return
+          }
+
+          setProcessingStep('translating')
+          const detRaw = await detectLanguage(transcript, signal)
+          let textApp = detRaw
+            ? normalizeGoogleLangToAppCode(detRaw)
+            : null
+          textApp = applyBidirectionalKanaJaHint(
+            textApp,
+            transcript,
+            pairLangA,
+            pairLangB,
+          )
+          let detectedApp = textApp
+          if (!detectedApp && detectedSpeechLanguage) {
+            detectedApp = normalizeGoogleLangToAppCode(detectedSpeechLanguage)
+          }
+
+          const dir = resolveBidirectionalTranslatePair(
+            detectedApp,
+            pairLangA,
+            pairLangB,
+          )
+          if (!dir) {
+            setHint(
+              '無法判斷為已選的兩種語言之一，請再試一次或交換語言 A/B（主／輔辨識）。',
+            )
+            setSourceText(transcript)
+            setTranslatedText('')
+            setLastDetectedLang('')
+            setLastTargetLang('')
+            return
+          }
+
+          effectiveSource = dir.sourceLang
+          effectiveTarget = dir.targetLang
+          setLastDetectedLang(effectiveSource)
+          setLastTargetLang(effectiveTarget)
+        } else {
+          const { transcript: tr } = await recognizeSpeech(
+            b64,
+            blob.type || 'audio/webm',
+            sourceLang,
+            signal,
+          )
+          transcript = tr
+          effectiveSource = sourceLang
+          effectiveTarget = targetLang
+
+          if (!transcript.trim()) {
+            setHint('辨識結果為空，請靠近麥克風或說大聲一點。')
+            setSourceText('（無辨識內容）')
+            setTranslatedText('')
+            return
+          }
         }
+
         setSourceText(transcript)
         setProcessingStep('translating')
         const translated = await translateText(
           transcript,
-          targetLang,
-          sourceLang,
+          effectiveTarget,
+          effectiveSource,
           signal,
         )
         setTranslatedText(translated)
         setHint(null)
         setProcessingStep('speaking')
         try {
-          await playTranslatedTts(translated, targetLang, signal)
+          await playTranslatedTts(translated, effectiveTarget, signal)
         } catch (ttsErr) {
           if (isAbortError(ttsErr)) return
           const ttsMsg =
@@ -186,6 +300,9 @@ export default function App() {
   }, [
     busy,
     recording,
+    translateMode,
+    pairLangA,
+    pairLangB,
     sourceLang,
     targetLang,
     startRecording,
@@ -217,6 +334,9 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [busy])
 
+  const quickTestTarget =
+    translateMode === 'bidirectional' ? pairLangB : targetLang
+
   const runQuickTranslateTest = useCallback(async () => {
     setQuickTestMsg(null)
     setQuickTestBusy(true)
@@ -226,7 +346,7 @@ export default function App() {
     try {
       const out = await translateText(
         '你好，這是前端直接呼叫 Google Translation API 的測試。',
-        targetLang,
+        quickTestTarget,
         'zh-TW',
         ac.signal,
       )
@@ -240,7 +360,7 @@ export default function App() {
       if (quickTestAbortRef.current === ac) quickTestAbortRef.current = null
       setQuickTestBusy(false)
     }
-  }, [targetLang])
+  }, [quickTestTarget])
 
   const phase = derivePhase(recording, busy, processingStep)
 
@@ -271,6 +391,25 @@ export default function App() {
     levels.length >= VIZ_BAR_COUNT
       ? levels
       : [...levels, ...Array.from({ length: VIZ_BAR_COUNT - levels.length }, () => 0.06)]
+
+  const bubbleOutLangTag =
+    translateMode === 'bidirectional'
+      ? lastDetectedLang
+        ? languageLabel(lastDetectedLang)
+        : '本次辨識'
+      : languageLabel(sourceLang)
+
+  const bubbleInLangTag =
+    translateMode === 'bidirectional'
+      ? lastTargetLang
+        ? languageLabel(lastTargetLang)
+        : '本次譯文'
+      : languageLabel(targetLang)
+
+  const swapDisabled =
+    recording ||
+    busy ||
+    (translateMode === 'oneWay' && sourceLang === 'auto')
 
   return (
     <div className="app-shell">
@@ -342,58 +481,158 @@ export default function App() {
         </header>
 
         <section className="lang-bar glass-panel" aria-label="語言設定">
-          <label className="sr-only" htmlFor={`${id}-source`}>
-            來源語言
-          </label>
-          <select
-            id={`${id}-source`}
-            className="glass-select"
-            value={sourceLang}
-            onChange={(e) => setSourceLang(e.target.value)}
-            disabled={recording || busy}
+          <div
+            className="mode-switch"
+            role="group"
+            aria-label="翻譯模式"
           >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.label}
-              </option>
-            ))}
-          </select>
+            <button
+              type="button"
+              className={[
+                'mode-switch__btn',
+                translateMode === 'oneWay' ? 'mode-switch__btn--active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setTranslateMode('oneWay')}
+              disabled={recording || busy}
+            >
+              單向
+            </button>
+            <button
+              type="button"
+              className={[
+                'mode-switch__btn',
+                translateMode === 'bidirectional'
+                  ? 'mode-switch__btn--active'
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setTranslateMode('bidirectional')}
+              disabled={recording || busy}
+            >
+              雙向對話
+            </button>
+          </div>
 
-          <button
-            type="button"
-            className="swap-btn"
-            onClick={swapLanguages}
-            disabled={sourceLang === 'auto' || recording || busy}
-            title={sourceLang === 'auto' ? '自動偵測時無法交換' : '交換語言'}
-            aria-label="交換來源與目標語言"
-          >
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
-              <path
-                d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12m0 0l4-4m-4 4-4-4"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {translateMode === 'oneWay' ? (
+            <>
+              <label className="sr-only" htmlFor={`${id}-source`}>
+                來源語言
+              </label>
+              <select
+                id={`${id}-source`}
+                className="glass-select"
+                value={sourceLang}
+                onChange={(e) => setSourceLang(e.target.value)}
+                disabled={recording || busy}
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
 
-          <label className="sr-only" htmlFor={`${id}-target`}>
-            目標語言
-          </label>
-          <select
-            id={`${id}-target`}
-            className="glass-select"
-            value={targetLang}
-            onChange={(e) => setTargetLang(e.target.value)}
-            disabled={recording || busy}
-          >
-            {LANGUAGES.filter((l) => l.code !== 'auto').map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.label}
-              </option>
-            ))}
-          </select>
+              <button
+                type="button"
+                className="swap-btn"
+                onClick={swapLanguages}
+                disabled={swapDisabled}
+                title={
+                  sourceLang === 'auto'
+                    ? '自動偵測時無法交換'
+                    : '交換來源與目標語言'
+                }
+                aria-label="交換來源與目標語言"
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                  <path
+                    d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12m0 0l4-4m-4 4-4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              <label className="sr-only" htmlFor={`${id}-target`}>
+                目標語言
+              </label>
+              <select
+                id={`${id}-target`}
+                className="glass-select"
+                value={targetLang}
+                onChange={(e) => setTargetLang(e.target.value)}
+                disabled={recording || busy}
+              >
+                {LANGUAGES.filter((l) => l.code !== 'auto').map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <label className="sr-only" htmlFor={`${id}-pair-a`}>
+                語言 A（主辨識）
+              </label>
+              <select
+                id={`${id}-pair-a`}
+                className="glass-select"
+                value={pairLangA}
+                onChange={(e) => setPairA(e.target.value)}
+                disabled={recording || busy}
+                title="語音辨識主語言（可多語時影響偏置，可與 B 交換）"
+              >
+                {PAIR_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className="swap-btn"
+                onClick={swapLanguages}
+                disabled={recording || busy}
+                title="交換語言 A/B（主／輔辨識）"
+                aria-label="交換雙向語言 A 與 B"
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+                  <path
+                    d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12m0 0l4-4m-4 4-4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              <label className="sr-only" htmlFor={`${id}-pair-b`}>
+                語言 B（輔辨識）
+              </label>
+              <select
+                id={`${id}-pair-b`}
+                className="glass-select"
+                value={pairLangB}
+                onChange={(e) => setPairB(e.target.value)}
+                disabled={recording || busy}
+                title="替代辨識語言"
+              >
+                {PAIR_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </section>
 
         {recording ? (
@@ -409,8 +648,15 @@ export default function App() {
               <article className="bubble bubble--out">
                 <header className="bubble__meta">
                   <span className="bubble__name">你</span>
-                  <span className="bubble__lang">
-                    {languageLabel(sourceLang)}
+                  <span
+                    className="bubble__lang"
+                    title={
+                      translateMode === 'bidirectional'
+                        ? '本次辨識語言'
+                        : undefined
+                    }
+                  >
+                    {bubbleOutLangTag}
                   </span>
                 </header>
                 <div className="bubble__body">
@@ -434,8 +680,15 @@ export default function App() {
               >
                 <header className="bubble__meta">
                   <span className="bubble__name">譯文</span>
-                  <span className="bubble__lang">
-                    {languageLabel(targetLang)}
+                  <span
+                    className="bubble__lang"
+                    title={
+                      translateMode === 'bidirectional'
+                        ? '本次朗讀／譯文語言'
+                        : undefined
+                    }
+                  >
+                    {bubbleInLangTag}
                   </span>
                 </header>
                 <motion.div
@@ -469,7 +722,10 @@ export default function App() {
               {quickTestBusy ? '測試中…' : '快速測試翻譯 API'}
             </button>
             <span className="quick-test__meta">
-              使用目前「目標語言」；需已在根目錄 <code className="quick-test__code">.env</code> 設定{' '}
+              {translateMode === 'bidirectional'
+                ? `使用目前雙向配對的語言 B（${languageLabel(pairLangB)}）；`
+                : '使用目前「目標語言」；'}
+              需已在根目錄 <code className="quick-test__code">.env</code> 設定{' '}
               <code className="quick-test__code">VITE_GOOGLE_CLOUD_API_KEY</code>
             </span>
           </div>

@@ -17,8 +17,8 @@ function parseGoogleError(body: unknown): string {
   return 'Google API 請求失敗'
 }
 
-/** @param {string | undefined} code */
-function speechLanguageCode(code: string | undefined): string {
+/** Speech-to-Text `RecognitionConfig.languageCode` / `alternativeLanguageCodes` */
+export function speechLanguageCode(code: string | undefined): string {
   const map: Record<string, string> = {
     'zh-TW': 'zh-TW',
     'zh-CN': 'zh-CN',
@@ -92,6 +92,40 @@ export async function synthesizeSpeechMp3Base64(
   return audioContent
 }
 
+export async function detectLanguage(
+  text: string,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  const key = getApiKey()
+  const trimmed = text.trim()
+  if (!trimmed) return undefined
+
+  const res = await fetch(
+    `https://translation.googleapis.com/language/translate/v2/detect?key=${encodeURIComponent(key)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: trimmed }),
+      signal,
+    },
+  )
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(parseGoogleError(data))
+
+  const det = (
+    data as {
+      data?: { detections?: { language?: string }[][] }
+    }
+  ).data?.detections?.[0]?.[0]?.language
+  return typeof det === 'string' ? det : undefined
+}
+
+export type RecognizeSpeechResult = {
+  transcript: string
+  detectedSpeechLanguage?: string
+}
+
 export async function translateText(
   text: string,
   targetLanguageCode: string,
@@ -134,11 +168,13 @@ export async function recognizeSpeech(
   mimeType: string,
   languageCode: string,
   signal?: AbortSignal,
-): Promise<string> {
+  opts?: { alternativeLanguageCodes?: string[] },
+): Promise<RecognizeSpeechResult> {
   const key = getApiKey()
   const lang = speechLanguageCode(
     languageCode === 'auto' ? undefined : languageCode,
   )
+  const alts = opts?.alternativeLanguageCodes?.filter((c) => c && c !== lang).slice(0, 2)
   const isWebm =
     (mimeType && mimeType.includes('webm')) || !mimeType || mimeType.includes('opus')
 
@@ -147,12 +183,18 @@ export async function recognizeSpeech(
         encoding: 'WEBM_OPUS' as const,
         sampleRateHertz: 48000,
         languageCode: lang,
+        ...(alts && alts.length > 0
+          ? { alternativeLanguageCodes: alts }
+          : {}),
         enableAutomaticPunctuation: true,
       }
     : {
         encoding: 'LINEAR16' as const,
         sampleRateHertz: 16000,
         languageCode: lang,
+        ...(alts && alts.length > 0
+          ? { alternativeLanguageCodes: alts }
+          : {}),
         enableAutomaticPunctuation: true,
       }
 
@@ -172,11 +214,27 @@ export async function recognizeSpeech(
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(parseGoogleError(data))
 
-  const results = (data as { results?: { alternatives?: { transcript?: string }[] }[] })
-    .results
+  const results = (
+    data as {
+      results?: {
+        alternatives?: { transcript?: string }[]
+        languageCode?: string
+      }[]
+    }
+  ).results
+
+  let detectedSpeechLanguage: string | undefined
+  for (const r of results ?? []) {
+    const lc = r.languageCode
+    if (typeof lc === 'string' && lc.length > 0) {
+      detectedSpeechLanguage = lc
+      break
+    }
+  }
+
   const transcript =
     results?.map((r) => r.alternatives?.[0]?.transcript ?? '').join('\n').trim() ?? ''
-  return transcript
+  return { transcript, detectedSpeechLanguage }
 }
 
 export function blobToBase64(blob: Blob): Promise<string> {

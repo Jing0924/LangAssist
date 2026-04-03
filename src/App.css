@@ -330,6 +330,64 @@
   justify-content: center;
 }
 
+.mode-switch {
+  display: flex;
+  flex: 1 1 100%;
+  justify-content: center;
+  gap: 0.35rem;
+  padding-bottom: 0.15rem;
+}
+
+@media (min-width: 720px) {
+  .mode-switch {
+    flex: 0 1 auto;
+    justify-content: flex-start;
+    padding-bottom: 0;
+    width: auto;
+  }
+
+  .lang-bar {
+    justify-content: center;
+  }
+}
+
+.mode-switch__btn {
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.mode-switch__btn:hover:not(:disabled) {
+  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.mode-switch__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mode-switch__btn--active {
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  background: rgba(34, 211, 238, 0.1);
+}
+
+.mode-switch__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .glass-select {
   flex: 1 1 140px;
   min-width: 140px;
