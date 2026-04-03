@@ -1,0 +1,137 @@
+{
+  "app": {
+    "brandTitle": "LangAssist",
+    "tagline": "Language assist · VoiceTranslate",
+    "documentTitle": "LangAssist — Language assist"
+  },
+  "nav": {
+    "mainAria": "Main navigation",
+    "voice": "Live voice",
+    "vocabulary": "Vocabulary",
+    "speaking": "Speaking practice"
+  },
+  "localeSwitcher": {
+    "aria": "Interface language",
+    "zhTW": "繁體中文",
+    "en": "English"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "retry": "Try again"
+  },
+  "api": {
+    "missingKey": "Set VITE_GOOGLE_CLOUD_API_KEY in a .env file at the project root (Google Cloud credentials → API key, with Speech-to-Text, Translation, and Text-to-Speech enabled).",
+    "requestFailed": "Google API request failed",
+    "emptyTtsText": "Text to speak is empty",
+    "ttsMalformed": "Unexpected text-to-speech response",
+    "translateMalformed": "Unexpected translation response",
+    "readAudioFailed": "Could not read audio"
+  },
+  "languages": {
+    "unknown": "—",
+    "codes": {
+      "auto": "Auto-detect",
+      "zh-TW": "Traditional Chinese",
+      "zh-CN": "Simplified Chinese",
+      "en": "English",
+      "ja": "Japanese",
+      "ko": "Korean",
+      "es": "Spanish",
+      "fr": "French"
+    }
+  },
+  "voice": {
+    "pageAria": "Live voice translation",
+    "emptyTranscript": "(No speech recognized)",
+    "status": {
+      "listening": "Listening",
+      "recognizing": "Recognizing",
+      "translating": "Translating",
+      "speaking": "Playing audio",
+      "idle": "Idle"
+    },
+    "toolbar": {
+      "title": "Live voice translation",
+      "subtitle": "Press Space or use the mic below to start / stop"
+    },
+    "langBarAria": "Language settings",
+    "mode": {
+      "groupAria": "Translation mode",
+      "oneWay": "One-way",
+      "bidirectional": "Two-way"
+    },
+    "lang": {
+      "source": "Source language",
+      "target": "Target language",
+      "pairA": "Language A (primary STT)",
+      "pairB": "Language B (alternate STT)"
+    },
+    "swap": {
+      "titleAuto": "Cannot swap while source is auto-detect",
+      "titleOneWay": "Swap source and target",
+      "ariaOneWay": "Swap source and target languages",
+      "titleBidirectional": "Swap languages A / B (primary / alternate STT)",
+      "ariaBidirectional": "Swap two-way languages A and B"
+    },
+    "pairSelect": {
+      "aTitle": "Primary speech language (biases recognition; can swap with B)",
+      "bTitle": "Alternate recognition language"
+    },
+    "bubble": {
+      "you": "You",
+      "translation": "Translation",
+      "titleDetectedThisRound": "Detected language (this turn)",
+      "titleTranslationThisRound": "TTS / translation language (this turn)",
+      "fallbackDetectedSession": "This recognition",
+      "fallbackTranslationSession": "This translation",
+      "placeholderSource": "Original text appears here. Tap the mic or press Space to speak.",
+      "placeholderTranslation": "Translation appears in this bubble and is read aloud when ready.",
+      "replaySourceAria": "Replay original audio",
+      "replaySourceTitle": "Replay original audio",
+      "replayTranslationAria": "Replay translation audio",
+      "replayTranslationTitle": "Replay translation audio"
+    },
+    "viz": {
+      "waveformAria": "Volume waveform",
+      "hint": "Recording… press again or press Space to stop"
+    },
+    "chatAria": "Conversation",
+    "hints": {
+      "noAudioBlob": "No audio captured. Please try again.",
+      "emptyRecognize": "Nothing recognized. Move closer to the mic or speak louder.",
+      "bidirectionalUnknown": "Could not match either selected language. Try again or swap A / B (primary / alternate STT).",
+      "ttsAfterTranslate": "Translated, but playback failed: {{message}}",
+      "micDenied": "Microphone access denied. Check browser permissions.",
+      "sourceReplayFailed": "Original playback failed: {{message}}",
+      "translationReplayFailed": "Translation playback failed: {{message}}"
+    },
+    "quickTest": {
+      "aria": "Quick API test",
+      "button": "Quick translation API test",
+      "testing": "Testing…",
+      "metaBidirectionalLead": "Uses language B of the current pair ({{label}}); ",
+      "metaOneWayLead": "Uses the current target language; ",
+      "metaEnv": "requires <code>.env</code> at the project root with <code>VITE_GOOGLE_CLOUD_API_KEY</code>",
+      "success": "OK: {{result}}",
+      "error": "Failed: {{message}}"
+    },
+    "controls": {
+      "micStart": "Start recording",
+      "micStop": "Stop and translate",
+      "processingRecognizing": "Recognizing speech…",
+      "processingTranslating": "Translating…",
+      "processingSpeaking": "Playing translation…",
+      "processingGeneric": "Working…",
+      "recordingStop": "Tap again or press Space to stop recording",
+      "idleCredentials": "Space or tap the mic to start. Credentials use an API key; see .env.example"
+    }
+  },
+  "vocabularyPage": {
+    "title": "Vocabulary",
+    "body": "Flashcards, spaced repetition, and API integration will arrive in a later release. This page is a placeholder."
+  },
+  "speakingPage": {
+    "title": "Speaking practice",
+    "body": "Future recording, speech recognition, and pronunciation hints will reuse this app’s voice pipeline. This page is a placeholder."
+  }
+}

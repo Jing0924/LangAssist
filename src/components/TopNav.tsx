@@ -1,15 +1,20 @@
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { LocaleSwitcher } from './LocaleSwitcher'
 
 const links = [
-  { to: '/voice', label: '即時語音' },
-  { to: '/vocabulary', label: '單字學習' },
-  { to: '/speaking', label: '口說練習' },
+  { to: '/voice', labelKey: 'nav.voice' as const },
+  { to: '/vocabulary', labelKey: 'nav.vocabulary' as const },
+  { to: '/speaking', labelKey: 'nav.speaking' as const },
 ] as const
 
 export function TopNav() {
+  const { t } = useTranslation()
+
   return (
-    <nav className="top-nav" aria-label="主要功能">
-      {links.map(({ to, label }) => (
+    <div className="site-header__actions">
+      <nav className="top-nav" aria-label={t('nav.mainAria')}>
+      {links.map(({ to, labelKey }) => (
         <NavLink
           key={to}
           to={to}
@@ -20,9 +25,11 @@ export function TopNav() {
           }
           end
         >
-          {label}
+          {t(labelKey)}
         </NavLink>
       ))}
-    </nav>
+      </nav>
+      <LocaleSwitcher />
+    </div>
   )
 }

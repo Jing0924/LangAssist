@@ -1,9 +1,9 @@
+import i18n from './i18n'
+
 function getApiKey(): string {
   const key = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY?.trim()
   if (!key) {
-    throw new Error(
-      '請在專案根目錄 .env 設定 VITE_GOOGLE_CLOUD_API_KEY（Google Cloud 憑證 → API 金鑰，並啟用 Speech-to-Text、Translation、Text-to-Speech）。',
-    )
+    throw new Error(i18n.t('api.missingKey'))
   }
   return key
 }
@@ -14,7 +14,7 @@ function parseGoogleError(body: unknown): string {
     const msg = err?.message ?? err?.status
     if (msg) return msg
   }
-  return 'Google API 請求失敗'
+  return i18n.t('api.requestFailed')
 }
 
 /** Speech-to-Text `RecognitionConfig.languageCode` / `alternativeLanguageCodes` */
@@ -62,7 +62,7 @@ export async function synthesizeSpeechMp3Base64(
 ): Promise<string> {
   const key = getApiKey()
   const trimmed = text.trim()
-  if (!trimmed) throw new Error('朗讀文字為空')
+  if (!trimmed) throw new Error(i18n.t('api.emptyTtsText'))
 
   const res = await fetch(
     `https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(key)}`,
@@ -87,7 +87,7 @@ export async function synthesizeSpeechMp3Base64(
 
   const audioContent = (data as { audioContent?: string }).audioContent
   if (typeof audioContent !== 'string' || !audioContent) {
-    throw new Error('語音合成回應格式異常')
+    throw new Error(i18n.t('api.ttsMalformed'))
   }
   return audioContent
 }
@@ -159,7 +159,7 @@ export async function translateText(
   const translations = (data as { data?: { translations?: { translatedText?: string }[] } })
     .data?.translations
   const out = translations?.[0]?.translatedText
-  if (typeof out !== 'string') throw new Error('翻譯回應格式異常')
+  if (typeof out !== 'string') throw new Error(i18n.t('api.translateMalformed'))
   return out
 }
 
@@ -243,7 +243,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
     reader.onloadend = () => {
       const result = reader.result
       if (typeof result !== 'string') {
-        reject(new Error('無法讀取音訊'))
+        reject(new Error(i18n.t('api.readAudioFailed')))
         return
       }
       const idx = result.indexOf(',')

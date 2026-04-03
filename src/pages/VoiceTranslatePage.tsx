@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { isAbortError } from '../abortError'
 import {
   blobToBase64,
@@ -20,6 +21,18 @@ import {
   normalizeGoogleLangToAppCode,
   resolveBidirectionalTranslatePair,
 } from '../languages'
+
+/** Internal state only; UI string is `voice.emptyTranscript`. */
+const EMPTY_TRANSCRIPT_TOKEN = '__EMPTY__'
+
+type FooterHint =
+  | null
+  | { k: string; v?: Record<string, string> }
+  | { raw: string }
+
+type QuickTestResult =
+  | { kind: 'success'; text: string }
+  | { kind: 'error'; text: string }
 
 type ProcessingStep = 'recognizing' | 'translating' | 'speaking'
 
@@ -57,8 +70,9 @@ function StreamedText({
 }
 
 function VoiceWaveform({ levels }: { levels: number[] }) {
+  const { t } = useTranslation()
   return (
-    <div className="voice-viz__bars" role="img" aria-label="音量波形">
+    <div className="voice-viz__bars" role="img" aria-label={t('voice.viz.waveformAria')}>
       {levels.map((lv, i) => (
         <span
           key={i}
@@ -74,6 +88,7 @@ function VoiceWaveform({ levels }: { levels: number[] }) {
 }
 
 export default function VoiceTranslatePage() {
+  const { t } = useTranslation()
   const id = useId()
   const [recording, setRecording] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -92,8 +107,10 @@ export default function VoiceTranslatePage() {
     useState<string>('')
   const [sourceText, setSourceText] = useState('')
   const [translatedText, setTranslatedText] = useState('')
-  const [hint, setHint] = useState<string | null>(null)
-  const [quickTestMsg, setQuickTestMsg] = useState<string | null>(null)
+  const [hint, setHint] = useState<FooterHint>(null)
+  const [quickTestResult, setQuickTestResult] = useState<QuickTestResult | null>(
+    null,
+  )
   const [quickTestBusy, setQuickTestBusy] = useState(false)
   const [replayTtsBusy, setReplayTtsBusy] = useState(false)
 
@@ -185,7 +202,7 @@ export default function VoiceTranslatePage() {
       try {
         const blob = await stopRecordingAndGetBlob()
         if (!blob) {
-          setHint('沒有錄到音訊，請再試一次。')
+          setHint({ k: 'voice.hints.noAudioBlob' })
           return
         }
         const b64 = await blobToBase64(blob)
@@ -209,8 +226,8 @@ export default function VoiceTranslatePage() {
           transcript = tr
 
           if (!transcript.trim()) {
-            setHint('辨識結果為空，請靠近麥克風或說大聲一點。')
-            setSourceText('（無辨識內容）')
+            setHint({ k: 'voice.hints.emptyRecognize' })
+            setSourceText(EMPTY_TRANSCRIPT_TOKEN)
             setTranslatedText('')
             setLastDetectedLang('')
             setLastTargetLang('')
@@ -239,9 +256,7 @@ export default function VoiceTranslatePage() {
             pairLangB,
           )
           if (!dir) {
-            setHint(
-              '無法判斷為已選的兩種語言之一，請再試一次或交換語言 A/B（主／輔辨識）。',
-            )
+            setHint({ k: 'voice.hints.bidirectionalUnknown' })
             setSourceText(transcript)
             setTranslatedText('')
             setLastDetectedLang('')
@@ -266,8 +281,8 @@ export default function VoiceTranslatePage() {
           effectiveTarget = targetLang
 
           if (!transcript.trim()) {
-            setHint('辨識結果為空，請靠近麥克風或說大聲一點。')
-            setSourceText('（無辨識內容）')
+            setHint({ k: 'voice.hints.emptyRecognize' })
+            setSourceText(EMPTY_TRANSCRIPT_TOKEN)
             setTranslatedText('')
             setLastOneWayAutoSourceLang('')
             return
@@ -303,12 +318,15 @@ export default function VoiceTranslatePage() {
           if (isAbortError(ttsErr)) return
           const ttsMsg =
             ttsErr instanceof Error ? ttsErr.message : String(ttsErr)
-          setHint(`翻譯完成，但朗讀失敗：${ttsMsg}`)
+          setHint({
+            k: 'voice.hints.ttsAfterTranslate',
+            v: { message: ttsMsg },
+          })
         }
       } catch (e) {
         if (isAbortError(e)) return
         const msg = e instanceof Error ? e.message : String(e)
-        setHint(msg)
+        setHint({ raw: msg })
       } finally {
         if (pipelineAbortRef.current === ac) pipelineAbortRef.current = null
         setBusy(false)
@@ -319,7 +337,7 @@ export default function VoiceTranslatePage() {
     try {
       await startRecording()
     } catch {
-      setHint('無法存取麥克風，請確認瀏覽器權限。')
+      setHint({ k: 'voice.hints.micDenied' })
     }
   }, [
     busy,
@@ -362,24 +380,25 @@ export default function VoiceTranslatePage() {
     translateMode === 'bidirectional' ? pairLangB : targetLang
 
   const runQuickTranslateTest = useCallback(async () => {
-    setQuickTestMsg(null)
+    setQuickTestResult(null)
     setQuickTestBusy(true)
     quickTestAbortRef.current?.abort()
     const ac = new AbortController()
     quickTestAbortRef.current = ac
     try {
+      // Fixed Chinese test utterance — source for API check, not UI copy.
       const out = await translateText(
         '你好，這是前端直接呼叫 Google Translation API 的測試。',
         quickTestTarget,
         'zh-TW',
         ac.signal,
       )
-      setQuickTestMsg(`成功：${out}`)
+      setQuickTestResult({ kind: 'success', text: out })
       setHint(null)
     } catch (e) {
       if (isAbortError(e)) return
       const msg = e instanceof Error ? e.message : String(e)
-      setQuickTestMsg(`失敗：${msg}`)
+      setQuickTestResult({ kind: 'error', text: msg })
     } finally {
       if (quickTestAbortRef.current === ac) quickTestAbortRef.current = null
       setQuickTestBusy(false)
@@ -402,14 +421,14 @@ export default function VoiceTranslatePage() {
 
   const statusLabel =
     phase === 'listening'
-      ? '聆聽中'
+      ? t('voice.status.listening')
       : phase === 'recognizing'
-        ? '辨識中'
+        ? t('voice.status.recognizing')
         : phase === 'translating'
-          ? '翻譯中'
+          ? t('voice.status.translating')
           : phase === 'speaking'
-            ? '播放語音中'
-            : '待機中'
+            ? t('voice.status.speaking')
+            : t('voice.status.idle')
 
   const safeLevels =
     levels.length >= VIZ_BAR_COUNT
@@ -419,16 +438,16 @@ export default function VoiceTranslatePage() {
   const bubbleOutLangTag =
     translateMode === 'bidirectional'
       ? lastDetectedLang
-        ? languageLabel(lastDetectedLang)
-        : '本次辨識'
-      : languageLabel(sourceLang)
+        ? languageLabel(lastDetectedLang, t)
+        : t('voice.bubble.fallbackDetectedSession')
+      : languageLabel(sourceLang, t)
 
   const bubbleInLangTag =
     translateMode === 'bidirectional'
       ? lastTargetLang
-        ? languageLabel(lastTargetLang)
-        : '本次譯文'
-      : languageLabel(targetLang)
+        ? languageLabel(lastTargetLang, t)
+        : t('voice.bubble.fallbackTranslationSession')
+      : languageLabel(targetLang, t)
 
   const ttsReplayLang =
     translateMode === 'bidirectional' ? lastTargetLang : targetLang
@@ -442,7 +461,7 @@ export default function VoiceTranslatePage() {
   const sourceTextForReplay = sourceText.trim()
   const hasReplayableSourceBody =
     Boolean(sourceTextForReplay) &&
-    sourceTextForReplay !== '（無辨識內容）'
+    sourceTextForReplay !== EMPTY_TRANSCRIPT_TOKEN
 
   const canReplaySourceTts =
     hasReplayableSourceBody &&
@@ -465,7 +484,10 @@ export default function VoiceTranslatePage() {
     } catch (e) {
       if (isAbortError(e)) return
       const ttsMsg = e instanceof Error ? e.message : String(e)
-      setHint(`原文朗讀失敗：${ttsMsg}`)
+      setHint({
+        k: 'voice.hints.sourceReplayFailed',
+        v: { message: ttsMsg },
+      })
     } finally {
       setReplayTtsBusy(false)
     }
@@ -485,7 +507,10 @@ export default function VoiceTranslatePage() {
     } catch (e) {
       if (isAbortError(e)) return
       const ttsMsg = e instanceof Error ? e.message : String(e)
-      setHint(`譯文朗讀失敗：${ttsMsg}`)
+      setHint({
+        k: 'voice.hints.translationReplayFailed',
+        v: { message: ttsMsg },
+      })
     } finally {
       setReplayTtsBusy(false)
     }
@@ -501,12 +526,22 @@ export default function VoiceTranslatePage() {
     busy ||
     (translateMode === 'oneWay' && sourceLang === 'auto')
 
+  const sourceDisplay =
+    sourceText === EMPTY_TRANSCRIPT_TOKEN ? t('voice.emptyTranscript') : sourceText
+
+  const footerHintText =
+    hint === null
+      ? null
+      : 'raw' in hint
+        ? hint.raw
+        : t(hint.k, hint.v)
+
   return (
-    <main className="voice-page" aria-label="語音即時翻譯">
+    <main className="voice-page" aria-label={t('voice.pageAria')}>
         <header className="glass-panel glass-panel--header voice-page__toolbar">
           <div className="voice-page__intro">
-            <h2 className="voice-page__title">語音即時翻譯</h2>
-            <p className="voice-page__hint">空白鍵或下方麥克風開始／結束收音</p>
+            <h2 className="voice-page__title">{t('voice.toolbar.title')}</h2>
+            <p className="voice-page__hint">{t('voice.toolbar.subtitle')}</p>
           </div>
           <div
             className={[
@@ -542,11 +577,11 @@ export default function VoiceTranslatePage() {
           </div>
         </header>
 
-        <section className="lang-bar glass-panel" aria-label="語言設定">
+        <section className="lang-bar glass-panel" aria-label={t('voice.langBarAria')}>
           <div
             className="mode-switch"
             role="group"
-            aria-label="翻譯模式"
+            aria-label={t('voice.mode.groupAria')}
           >
             <button
               type="button"
@@ -559,7 +594,7 @@ export default function VoiceTranslatePage() {
               onClick={() => setTranslateMode('oneWay')}
               disabled={recording || busy}
             >
-              單向
+              {t('voice.mode.oneWay')}
             </button>
             <button
               type="button"
@@ -574,14 +609,14 @@ export default function VoiceTranslatePage() {
               onClick={() => setTranslateMode('bidirectional')}
               disabled={recording || busy}
             >
-              雙向對話
+              {t('voice.mode.bidirectional')}
             </button>
           </div>
 
           {translateMode === 'oneWay' ? (
             <>
               <label className="sr-only" htmlFor={`${id}-source`}>
-                來源語言
+                {t('voice.lang.source')}
               </label>
               <select
                 id={`${id}-source`}
@@ -592,7 +627,7 @@ export default function VoiceTranslatePage() {
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {l.label}
+                    {t(`languages.codes.${l.code}`)}
                   </option>
                 ))}
               </select>
@@ -604,10 +639,10 @@ export default function VoiceTranslatePage() {
                 disabled={swapDisabled}
                 title={
                   sourceLang === 'auto'
-                    ? '自動偵測時無法交換'
-                    : '交換來源與目標語言'
+                    ? t('voice.swap.titleAuto')
+                    : t('voice.swap.titleOneWay')
                 }
-                aria-label="交換來源與目標語言"
+                aria-label={t('voice.swap.ariaOneWay')}
               >
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
                   <path
@@ -621,7 +656,7 @@ export default function VoiceTranslatePage() {
               </button>
 
               <label className="sr-only" htmlFor={`${id}-target`}>
-                目標語言
+                {t('voice.lang.target')}
               </label>
               <select
                 id={`${id}-target`}
@@ -632,7 +667,7 @@ export default function VoiceTranslatePage() {
               >
                 {LANGUAGES.filter((l) => l.code !== 'auto').map((l) => (
                   <option key={l.code} value={l.code}>
-                    {l.label}
+                    {t(`languages.codes.${l.code}`)}
                   </option>
                 ))}
               </select>
@@ -640,7 +675,7 @@ export default function VoiceTranslatePage() {
           ) : (
             <>
               <label className="sr-only" htmlFor={`${id}-pair-a`}>
-                語言 A（主辨識）
+                {t('voice.lang.pairA')}
               </label>
               <select
                 id={`${id}-pair-a`}
@@ -648,11 +683,11 @@ export default function VoiceTranslatePage() {
                 value={pairLangA}
                 onChange={(e) => setPairA(e.target.value)}
                 disabled={recording || busy}
-                title="語音辨識主語言（可多語時影響偏置，可與 B 交換）"
+                title={t('voice.pairSelect.aTitle')}
               >
                 {PAIR_LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {l.label}
+                    {t(`languages.codes.${l.code}`)}
                   </option>
                 ))}
               </select>
@@ -662,8 +697,8 @@ export default function VoiceTranslatePage() {
                 className="swap-btn"
                 onClick={swapLanguages}
                 disabled={recording || busy}
-                title="交換語言 A/B（主／輔辨識）"
-                aria-label="交換雙向語言 A 與 B"
+                title={t('voice.swap.titleBidirectional')}
+                aria-label={t('voice.swap.ariaBidirectional')}
               >
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
                   <path
@@ -677,7 +712,7 @@ export default function VoiceTranslatePage() {
               </button>
 
               <label className="sr-only" htmlFor={`${id}-pair-b`}>
-                語言 B（輔辨識）
+                {t('voice.lang.pairB')}
               </label>
               <select
                 id={`${id}-pair-b`}
@@ -685,11 +720,11 @@ export default function VoiceTranslatePage() {
                 value={pairLangB}
                 onChange={(e) => setPairB(e.target.value)}
                 disabled={recording || busy}
-                title="替代辨識語言"
+                title={t('voice.pairSelect.bTitle')}
               >
                 {PAIR_LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {l.label}
+                    {t(`languages.codes.${l.code}`)}
                   </option>
                 ))}
               </select>
@@ -700,22 +735,22 @@ export default function VoiceTranslatePage() {
         {recording ? (
           <div className="voice-viz glass-panel" aria-live="polite">
             <VoiceWaveform levels={safeLevels} />
-            <p className="voice-viz__hint">系統正在收音，結束時再按一次或按空白鍵</p>
+            <p className="voice-viz__hint">{t('voice.viz.hint')}</p>
           </div>
         ) : null}
 
-        <section className="chat-thread glass-panel" aria-label="對話">
+        <section className="chat-thread glass-panel" aria-label={t('voice.chatAria')}>
           <div className="chat-thread__inner">
             <div className="bubble-row bubble-row--out">
               <article className="bubble bubble--out">
                 <header className="bubble__meta">
-                  <span className="bubble__name">你</span>
+                  <span className="bubble__name">{t('voice.bubble.you')}</span>
                   <div className="bubble__meta-trailing">
                     <span
                       className="bubble__lang"
                       title={
                         translateMode === 'bidirectional'
-                          ? '本次辨識語言'
+                          ? t('voice.bubble.titleDetectedThisRound')
                           : undefined
                       }
                     >
@@ -729,8 +764,8 @@ export default function VoiceTranslatePage() {
                         disabled={
                           replayTtsBusy || busy || recording
                         }
-                        aria-label="重播原文朗讀"
-                        title="重播原文朗讀"
+                        aria-label={t('voice.bubble.replaySourceAria')}
+                        title={t('voice.bubble.replaySourceTitle')}
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -747,10 +782,10 @@ export default function VoiceTranslatePage() {
                 </header>
                 <div className="bubble__body">
                   {sourceText ? (
-                    <StreamedText text={sourceText} charMs={12} />
+                    <StreamedText text={sourceDisplay} charMs={12} />
                   ) : (
                     <span className="bubble__placeholder">
-                      原文會顯示在這裡；點擊麥克風或按空白鍵開始說話。
+                      {t('voice.bubble.placeholderSource')}
                     </span>
                   )}
                 </div>
@@ -765,13 +800,15 @@ export default function VoiceTranslatePage() {
                 onPointerLeave={bubbleMagnetic.onPointerLeave}
               >
                 <header className="bubble__meta">
-                  <span className="bubble__name">譯文</span>
+                  <span className="bubble__name">
+                    {t('voice.bubble.translation')}
+                  </span>
                   <div className="bubble__meta-trailing">
                     <span
                       className="bubble__lang"
                       title={
                         translateMode === 'bidirectional'
-                          ? '本次朗讀／譯文語言'
+                          ? t('voice.bubble.titleTranslationThisRound')
                           : undefined
                       }
                     >
@@ -785,8 +822,8 @@ export default function VoiceTranslatePage() {
                         disabled={
                           replayTtsBusy || busy || recording
                         }
-                        aria-label="重播譯文朗讀"
-                        title="重播譯文朗讀"
+                        aria-label={t('voice.bubble.replayTranslationAria')}
+                        title={t('voice.bubble.replayTranslationTitle')}
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -812,7 +849,7 @@ export default function VoiceTranslatePage() {
                     <StreamedText text={translatedText} charMs={10} />
                   ) : (
                     <span className="bubble__placeholder">
-                      譯文會以對話氣泡顯示，並在完成後自動朗讀。
+                      {t('voice.bubble.placeholderTranslation')}
                     </span>
                   )}
                 </motion.div>
@@ -821,7 +858,7 @@ export default function VoiceTranslatePage() {
           </div>
         </section>
 
-        <section className="quick-test glass-panel" aria-label="API 快速測試">
+        <section className="quick-test glass-panel" aria-label={t('voice.quickTest.aria')}>
           <div className="quick-test__row">
             <button
               type="button"
@@ -829,21 +866,31 @@ export default function VoiceTranslatePage() {
               onClick={() => void runQuickTranslateTest()}
               disabled={quickTestBusy || recording || busy}
             >
-              {quickTestBusy ? '測試中…' : '快速測試翻譯 API'}
+              {quickTestBusy
+                ? t('voice.quickTest.testing')
+                : t('voice.quickTest.button')}
             </button>
             <span className="quick-test__meta">
               {translateMode === 'bidirectional'
-                ? `使用目前雙向配對的語言 B（${languageLabel(pairLangB)}）；`
-                : '使用目前「目標語言」；'}
-              需已在根目錄 <code className="quick-test__code">.env</code> 設定{' '}
-              <code className="quick-test__code">VITE_GOOGLE_CLOUD_API_KEY</code>
+                ? t('voice.quickTest.metaBidirectionalLead', {
+                    label: languageLabel(pairLangB, t),
+                  })
+                : t('voice.quickTest.metaOneWayLead')}
+              <Trans
+                i18nKey="voice.quickTest.metaEnv"
+                components={{
+                  code: <code className="quick-test__code" />,
+                }}
+              />
             </span>
           </div>
-          {quickTestMsg ? (
+          {quickTestResult ? (
             <p
-              className={`quick-test__result ${quickTestMsg.startsWith('失敗') ? 'quick-test__result--error' : ''}`}
+              className={`quick-test__result ${quickTestResult.kind === 'error' ? 'quick-test__result--error' : ''}`}
             >
-              {quickTestMsg}
+              {quickTestResult.kind === 'success'
+                ? t('voice.quickTest.success', { result: quickTestResult.text })
+                : t('voice.quickTest.error', { message: quickTestResult.text })}
             </p>
           ) : null}
         </section>
@@ -865,7 +912,9 @@ export default function VoiceTranslatePage() {
             aria-pressed={recording}
             aria-busy={busy}
             disabled={busy}
-            aria-label={recording ? '停止並辨識翻譯' : '開始錄音'}
+            aria-label={
+              recording ? t('voice.controls.micStop') : t('voice.controls.micStart')
+            }
           >
             <span className="mic-btn__glow" aria-hidden="true" />
             <span className="mic-btn__ring" aria-hidden="true" />
@@ -901,18 +950,18 @@ export default function VoiceTranslatePage() {
           <p
             className={`controls__hint ${hint ? 'controls__hint--error' : ''}`}
           >
-            {hint ??
+            {footerHintText ??
               (busy
                 ? phase === 'recognizing'
-                  ? '語音辨識進行中…'
+                  ? t('voice.controls.processingRecognizing')
                   : phase === 'translating'
-                    ? '翻譯進行中…'
+                    ? t('voice.controls.processingTranslating')
                     : phase === 'speaking'
-                      ? '播放譯文朗讀…'
-                      : '處理中…'
+                      ? t('voice.controls.processingSpeaking')
+                      : t('voice.controls.processingGeneric')
                 : recording
-                  ? '再次點擊或空白鍵結束錄音'
-                  : '空白鍵或點擊麥克風開始；憑證為 API 金鑰，詳見 .env.example')}
+                  ? t('voice.controls.recordingStop')
+                  : t('voice.controls.idleCredentials'))}
           </p>
         </footer>
     </main>

@@ -1,0 +1,137 @@
+{
+  "app": {
+    "brandTitle": "LangAssist",
+    "tagline": "語言輔助 · VoiceTranslate",
+    "documentTitle": "LangAssist — 語言輔助"
+  },
+  "nav": {
+    "mainAria": "主要功能",
+    "voice": "即時語音",
+    "vocabulary": "單字學習",
+    "speaking": "口說練習"
+  },
+  "localeSwitcher": {
+    "aria": "介面語言",
+    "zhTW": "繁體中文",
+    "en": "English"
+  },
+  "errorBoundary": {
+    "title": "發生未預期錯誤",
+    "retry": "再試一次"
+  },
+  "api": {
+    "missingKey": "請在專案根目錄 .env 設定 VITE_GOOGLE_CLOUD_API_KEY（Google Cloud 憑證 → API 金鑰，並啟用 Speech-to-Text、Translation、Text-to-Speech）。",
+    "requestFailed": "Google API 請求失敗",
+    "emptyTtsText": "朗讀文字為空",
+    "ttsMalformed": "語音合成回應格式異常",
+    "translateMalformed": "翻譯回應格式異常",
+    "readAudioFailed": "無法讀取音訊"
+  },
+  "languages": {
+    "unknown": "—",
+    "codes": {
+      "auto": "自動偵測",
+      "zh-TW": "繁體中文",
+      "zh-CN": "简体中文",
+      "en": "English",
+      "ja": "日本語",
+      "ko": "한국어",
+      "es": "Español",
+      "fr": "Français"
+    }
+  },
+  "voice": {
+    "pageAria": "語音即時翻譯",
+    "emptyTranscript": "（無辨識內容）",
+    "status": {
+      "listening": "聆聽中",
+      "recognizing": "辨識中",
+      "translating": "翻譯中",
+      "speaking": "播放語音中",
+      "idle": "待機中"
+    },
+    "toolbar": {
+      "title": "語音即時翻譯",
+      "subtitle": "空白鍵或下方麥克風開始／結束收音"
+    },
+    "langBarAria": "語言設定",
+    "mode": {
+      "groupAria": "翻譯模式",
+      "oneWay": "單向",
+      "bidirectional": "雙向對話"
+    },
+    "lang": {
+      "source": "來源語言",
+      "target": "目標語言",
+      "pairA": "語言 A（主辨識）",
+      "pairB": "語言 B（輔辨識）"
+    },
+    "swap": {
+      "titleAuto": "自動偵測時無法交換",
+      "titleOneWay": "交換來源與目標語言",
+      "ariaOneWay": "交換來源與目標語言",
+      "titleBidirectional": "交換語言 A/B（主／輔辨識）",
+      "ariaBidirectional": "交換雙向語言 A 與 B"
+    },
+    "pairSelect": {
+      "aTitle": "語音辨識主語言（可多語時影響偏置，可與 B 交換）",
+      "bTitle": "替代辨識語言"
+    },
+    "bubble": {
+      "you": "你",
+      "translation": "譯文",
+      "titleDetectedThisRound": "本次辨識語言",
+      "titleTranslationThisRound": "本次朗讀／譯文語言",
+      "fallbackDetectedSession": "本次辨識",
+      "fallbackTranslationSession": "本次譯文",
+      "placeholderSource": "原文會顯示在這裡；點擊麥克風或按空白鍵開始說話。",
+      "placeholderTranslation": "譯文會以對話氣泡顯示，並在完成後自動朗讀。",
+      "replaySourceAria": "重播原文朗讀",
+      "replaySourceTitle": "重播原文朗讀",
+      "replayTranslationAria": "重播譯文朗讀",
+      "replayTranslationTitle": "重播譯文朗讀"
+    },
+    "viz": {
+      "waveformAria": "音量波形",
+      "hint": "系統正在收音，結束時再按一次或按空白鍵"
+    },
+    "chatAria": "對話",
+    "hints": {
+      "noAudioBlob": "沒有錄到音訊，請再試一次。",
+      "emptyRecognize": "辨識結果為空，請靠近麥克風或說大聲一點。",
+      "bidirectionalUnknown": "無法判斷為已選的兩種語言之一，請再試一次或交換語言 A/B（主／輔辨識）。",
+      "ttsAfterTranslate": "翻譯完成，但朗讀失敗：{{message}}",
+      "micDenied": "無法存取麥克風，請確認瀏覽器權限。",
+      "sourceReplayFailed": "原文朗讀失敗：{{message}}",
+      "translationReplayFailed": "譯文朗讀失敗：{{message}}"
+    },
+    "quickTest": {
+      "aria": "API 快速測試",
+      "button": "快速測試翻譯 API",
+      "testing": "測試中…",
+      "metaBidirectionalLead": "使用目前雙向配對的語言 B（{{label}}）；",
+      "metaOneWayLead": "使用目前「目標語言」；",
+      "metaEnv": "需已在根目錄 <code>.env</code> 設定 <code>VITE_GOOGLE_CLOUD_API_KEY</code>",
+      "success": "成功：{{result}}",
+      "error": "失敗：{{message}}"
+    },
+    "controls": {
+      "micStart": "開始錄音",
+      "micStop": "停止並辨識翻譯",
+      "processingRecognizing": "語音辨識進行中…",
+      "processingTranslating": "翻譯進行中…",
+      "processingSpeaking": "播放譯文朗讀…",
+      "processingGeneric": "處理中…",
+      "recordingStop": "再次點擊或空白鍵結束錄音",
+      "idleCredentials": "空白鍵或點擊麥克風開始；憑證為 API 金鑰，詳見 .env.example"
+    }
+  },
+  "vocabularyPage": {
+    "title": "單字學習",
+    "body": "字卡、複習排程與翻譯 API 整合等功能將在後續版本推出；此頁面為功能預留區。"
+  },
+  "speakingPage": {
+    "title": "口說練習",
+    "body": "未來可在此進行錄音、語音辨識與發音提示，並沿用本站現有的語音管線；目前為佔位頁面。"
+  }
+}

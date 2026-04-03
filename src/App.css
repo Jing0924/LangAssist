@@ -119,8 +119,26 @@
   gap: 1rem 1.5rem;
 }
 
-.site-header .top-nav {
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
   margin-left: auto;
+}
+
+.locale-switcher {
+  display: inline-flex;
+  align-items: center;
+}
+
+.glass-select--compact {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+  width: auto;
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  font-size: 0.8125rem;
 }
 
 .top-nav {
@@ -202,6 +220,14 @@
 }
 
 @media (max-width: 719px) {
+  .voice-page > .voice-page__toolbar {
+    order: 1;
+  }
+
+  .voice-page > .lang-bar {
+    order: 2;
+  }
+
   .voice-page > .controls {
     order: 3;
   }
