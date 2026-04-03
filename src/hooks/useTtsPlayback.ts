@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { synthesizeSpeechMp3Base64 } from '../api'
 
+function abortPromise(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    signal.addEventListener(
+      'abort',
+      () => reject(new DOMException('Aborted', 'AbortError')),
+      { once: true },
+    )
+  })
+}
+
 export function useTtsPlayback() {
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null)
   const ttsObjectUrlRef = useRef<string | null>(null)
@@ -30,14 +44,38 @@ export function useTtsPlayback() {
       ttsObjectUrlRef.current = url
       const audio = new Audio(url)
       ttsAudioRef.current = audio
-      audio.addEventListener('ended', () => {
-        stopTtsPlayback()
+
+      const playbackDone = new Promise<void>((resolve, reject) => {
+        const onEnded = () => {
+          stopTtsPlayback()
+          resolve()
+        }
+        const onError = () => {
+          stopTtsPlayback()
+          reject(new Error('Audio playback failed'))
+        }
+        audio.addEventListener('ended', onEnded, { once: true })
+        audio.addEventListener('error', onError, { once: true })
       })
+
       try {
         await audio.play()
       } catch (err) {
         stopTtsPlayback()
         throw err
+      }
+
+      signal?.throwIfAborted()
+
+      try {
+        if (signal) {
+          await Promise.race([playbackDone, abortPromise(signal)])
+        } else {
+          await playbackDone
+        }
+      } catch (e) {
+        stopTtsPlayback()
+        throw e
       }
     },
     [stopTtsPlayback],
