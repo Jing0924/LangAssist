@@ -1,24 +1,16 @@
-import { useCallback, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { isAbortError } from './abortError'
 import {
   blobToBase64,
   recognizeSpeech,
-  synthesizeSpeechMp3Base64,
   translateText,
 } from './api'
+import { useTtsPlayback } from './hooks/useTtsPlayback'
+import { useVoiceRecorder } from './hooks/useVoiceRecorder'
+import { LANGUAGES, languageLabel } from './languages'
 import './App.css'
 
-const LANGUAGES = [
-  { code: 'auto', label: '自動偵測' },
-  { code: 'zh-TW', label: '繁體中文' },
-  { code: 'zh-CN', label: '简体中文' },
-  { code: 'en', label: 'English' },
-  { code: 'ja', label: '日本語' },
-  { code: 'ko', label: '한국어' },
-  { code: 'es', label: 'Español' },
-  { code: 'fr', label: 'Français' },
-] as const
-
-function App() {
+export default function App() {
   const id = useId()
   const [recording, setRecording] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -32,47 +24,37 @@ function App() {
   const [quickTestMsg, setQuickTestMsg] = useState<string | null>(null)
   const [quickTestBusy, setQuickTestBusy] = useState(false)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
-  const ttsAudioRef = useRef<HTMLAudioElement | null>(null)
-  const ttsObjectUrlRef = useRef<string | null>(null)
+  const pipelineAbortRef = useRef<AbortController | null>(null)
+  const quickTestAbortRef = useRef<AbortController | null>(null)
 
-  const stopTtsPlayback = useCallback(() => {
-    const a = ttsAudioRef.current
-    if (a) {
-      a.pause()
-      a.src = ''
-      ttsAudioRef.current = null
-    }
-    if (ttsObjectUrlRef.current) {
-      URL.revokeObjectURL(ttsObjectUrlRef.current)
-      ttsObjectUrlRef.current = null
-    }
+  const { stopTtsPlayback, playTranslatedTts } = useTtsPlayback()
+
+  const abortPipeline = useCallback(() => {
+    pipelineAbortRef.current?.abort()
+    pipelineAbortRef.current = null
   }, [])
 
-  const playTranslatedTts = useCallback(
-    async (text: string, lang: string) => {
-      stopTtsPlayback()
-      const b64 = await synthesizeSpeechMp3Base64(text, lang)
-      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
-      const blob = new Blob([bytes], { type: 'audio/mpeg' })
-      const url = URL.createObjectURL(blob)
-      ttsObjectUrlRef.current = url
-      const audio = new Audio(url)
-      ttsAudioRef.current = audio
-      audio.addEventListener('ended', () => {
-        stopTtsPlayback()
-      })
-      try {
-        await audio.play()
-      } catch (err) {
-        stopTtsPlayback()
-        throw err
-      }
-    },
-    [stopTtsPlayback],
-  )
+  const prepareRecording = useCallback(() => {
+    abortPipeline()
+    stopTtsPlayback()
+    setHint(null)
+  }, [abortPipeline, stopTtsPlayback])
+
+  const { startRecording: armRecorder, stopRecordingAndGetBlob } =
+    useVoiceRecorder(prepareRecording)
+
+  useEffect(() => {
+    return () => {
+      abortPipeline()
+      quickTestAbortRef.current?.abort()
+      quickTestAbortRef.current = null
+    }
+  }, [abortPipeline])
+
+  const startRecording = useCallback(async () => {
+    await armRecorder()
+    setRecording(true)
+  }, [armRecorder])
 
   const swapLanguages = useCallback(() => {
     if (sourceLang === 'auto') return
@@ -82,59 +64,16 @@ function App() {
     setTargetLang(s)
   }, [sourceLang, targetLang])
 
-  const startRecording = useCallback(async () => {
-    stopTtsPlayback()
-    setHint(null)
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    streamRef.current = stream
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : ''
-
-    const recorder = mimeType
-      ? new MediaRecorder(stream, { mimeType })
-      : new MediaRecorder(stream)
-
-    chunksRef.current = []
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data)
-    }
-    recorder.start(250)
-    mediaRecorderRef.current = recorder
-    setRecording(true)
-  }, [stopTtsPlayback])
-
-  const stopRecordingAndGetBlob = useCallback(async (): Promise<Blob | null> => {
-    const recorder = mediaRecorderRef.current
-    mediaRecorderRef.current = null
-
-    if (!recorder || recorder.state === 'inactive') {
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-      return null
-    }
-
-    return new Promise((resolve) => {
-      recorder.addEventListener('stop', () => {
-        const blob = new Blob(chunksRef.current, {
-          type: recorder.mimeType || 'audio/webm',
-        })
-        streamRef.current?.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
-        resolve(blob.size > 0 ? blob : null)
-      })
-      recorder.stop()
-    })
-  }, [])
-
   const onMicClick = useCallback(async () => {
     if (busy) return
 
     if (recording) {
       setBusy(true)
       setRecording(false)
+      abortPipeline()
+      const ac = new AbortController()
+      pipelineAbortRef.current = ac
+      const { signal } = ac
       try {
         const blob = await stopRecordingAndGetBlob()
         if (!blob) {
@@ -146,6 +85,7 @@ function App() {
           b64,
           blob.type || 'audio/webm',
           sourceLang,
+          signal,
         )
         if (!transcript.trim()) {
           setHint('辨識結果為空，請靠近麥克風或說大聲一點。')
@@ -158,20 +98,24 @@ function App() {
           transcript,
           targetLang,
           sourceLang,
+          signal,
         )
         setTranslatedText(translated)
         setHint(null)
         try {
-          await playTranslatedTts(translated, targetLang)
+          await playTranslatedTts(translated, targetLang, signal)
         } catch (ttsErr) {
+          if (isAbortError(ttsErr)) return
           const ttsMsg =
             ttsErr instanceof Error ? ttsErr.message : String(ttsErr)
           setHint(`翻譯完成，但朗讀失敗：${ttsMsg}`)
         }
       } catch (e) {
+        if (isAbortError(e)) return
         const msg = e instanceof Error ? e.message : String(e)
         setHint(msg)
       } finally {
+        if (pipelineAbortRef.current === ac) pipelineAbortRef.current = null
         setBusy(false)
       }
       return
@@ -190,23 +134,30 @@ function App() {
     startRecording,
     stopRecordingAndGetBlob,
     playTranslatedTts,
+    abortPipeline,
   ])
 
   const runQuickTranslateTest = useCallback(async () => {
     setQuickTestMsg(null)
     setQuickTestBusy(true)
+    quickTestAbortRef.current?.abort()
+    const ac = new AbortController()
+    quickTestAbortRef.current = ac
     try {
       const out = await translateText(
         '你好，這是前端直接呼叫 Google Translation API 的測試。',
         targetLang,
         'zh-TW',
+        ac.signal,
       )
       setQuickTestMsg(`成功：${out}`)
       setHint(null)
     } catch (e) {
+      if (isAbortError(e)) return
       const msg = e instanceof Error ? e.message : String(e)
       setQuickTestMsg(`失敗：${msg}`)
     } finally {
+      if (quickTestAbortRef.current === ac) quickTestAbortRef.current = null
       setQuickTestBusy(false)
     }
   }, [targetLang])
@@ -316,7 +267,7 @@ function App() {
             <header className="transcript-card__head">
               <span className="transcript-card__label">原文</span>
               <span className="transcript-card__lang">
-                {LANGUAGES.find((l) => l.code === sourceLang)?.label ?? '—'}
+                {languageLabel(sourceLang)}
               </span>
             </header>
             <div className="transcript-card__body" role="textbox" aria-readonly>
@@ -328,7 +279,7 @@ function App() {
             <header className="transcript-card__head">
               <span className="transcript-card__label">譯文</span>
               <span className="transcript-card__lang">
-                {LANGUAGES.find((l) => l.code === targetLang)?.label ?? '—'}
+                {languageLabel(targetLang)}
               </span>
             </header>
             <div
@@ -403,5 +354,3 @@ function App() {
     </div>
   )
 }
-
-export default App

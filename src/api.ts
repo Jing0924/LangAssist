@@ -58,6 +58,7 @@ function ttsVoiceLanguageCode(code: string): string {
 export async function synthesizeSpeechMp3Base64(
   text: string,
   targetLanguageCode: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const key = getApiKey()
   const trimmed = text.trim()
@@ -77,6 +78,7 @@ export async function synthesizeSpeechMp3Base64(
           audioEncoding: 'MP3',
         },
       }),
+      signal,
     },
   )
 
@@ -94,6 +96,7 @@ export async function translateText(
   text: string,
   targetLanguageCode: string,
   sourceLanguageCode?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const key = getApiKey()
   const target = translateLanguageCode(targetLanguageCode)
@@ -112,6 +115,7 @@ export async function translateText(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal,
     },
   )
 
@@ -129,6 +133,7 @@ export async function recognizeSpeech(
   audioBase64: string,
   mimeType: string,
   languageCode: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const key = getApiKey()
   const lang = speechLanguageCode(
@@ -160,6 +165,7 @@ export async function recognizeSpeech(
         config,
         audio: { content: audioBase64 },
       }),
+      signal,
     },
   )
 
