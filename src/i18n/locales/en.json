@@ -93,7 +93,8 @@
     },
     "viz": {
       "waveformAria": "Volume waveform",
-      "hint": "Recording… press again or press Space to stop"
+      "hint": "Recording… press again or press Space to stop",
+      "timer": "{{current}} / {{max}} s (auto-stops at limit)"
     },
     "chatAria": "Conversation",
     "hints": {

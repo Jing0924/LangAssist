@@ -163,18 +163,66 @@ export async function translateText(
   return out
 }
 
+export type RecognizeSpeechOptions = {
+  alternativeLanguageCodes?: string[]
+  /** One-way `auto` source: bias primary STT to last successful detection (app code). */
+  autoLastDetectedAppCode?: string
+  /** One-way `auto` source: include target language as an alternative STT locale (app code). */
+  autoTargetAppCode?: string
+}
+
+function localesForRecognize(
+  languageCode: string,
+  opts?: RecognizeSpeechOptions,
+): { languageCode: string; alternativeLanguageCodes?: string[] } {
+  if (languageCode !== 'auto') {
+    const lang = speechLanguageCode(languageCode)
+    const alts = opts?.alternativeLanguageCodes
+      ?.filter((c) => c && c !== lang)
+      .slice(0, 2)
+    return {
+      languageCode: lang,
+      ...(alts && alts.length > 0 ? { alternativeLanguageCodes: alts } : {}),
+    }
+  }
+
+  const primary =
+    opts?.autoLastDetectedAppCode && opts.autoLastDetectedAppCode !== 'auto'
+      ? speechLanguageCode(opts.autoLastDetectedAppCode)
+      : 'en-US'
+
+  const pool: string[] = []
+  if (opts?.autoTargetAppCode && opts.autoTargetAppCode !== 'auto') {
+    pool.push(speechLanguageCode(opts.autoTargetAppCode))
+  }
+  pool.push(speechLanguageCode('zh-TW'), 'ja-JP')
+
+  const seen = new Set<string>()
+  const alts: string[] = []
+  for (const c of pool) {
+    if (c === primary || seen.has(c)) continue
+    seen.add(c)
+    alts.push(c)
+    if (alts.length >= 2) break
+  }
+
+  return {
+    languageCode: primary,
+    ...(alts.length > 0 ? { alternativeLanguageCodes: alts } : {}),
+  }
+}
+
 export async function recognizeSpeech(
   audioBase64: string,
   mimeType: string,
   languageCode: string,
   signal?: AbortSignal,
-  opts?: { alternativeLanguageCodes?: string[] },
+  opts?: RecognizeSpeechOptions,
 ): Promise<RecognizeSpeechResult> {
   const key = getApiKey()
-  const lang = speechLanguageCode(
-    languageCode === 'auto' ? undefined : languageCode,
-  )
-  const alts = opts?.alternativeLanguageCodes?.filter((c) => c && c !== lang).slice(0, 2)
+  const { languageCode: lang, alternativeLanguageCodes: altsFromMode } =
+    localesForRecognize(languageCode, opts)
+  const alts = altsFromMode
   const isWebm =
     (mimeType && mimeType.includes('webm')) || !mimeType || mimeType.includes('opus')
 

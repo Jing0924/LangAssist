@@ -22,6 +22,9 @@ import {
   resolveBidirectionalTranslatePair,
 } from '../languages'
 
+/** Sync `recognize` 對過長音檔較不穩定；達上限則自動停止並辨識。 */
+const RECORDING_MAX_SECONDS = 60
+
 /** Internal state only; UI string is `voice.emptyTranscript`. */
 const EMPTY_TRANSCRIPT_TOKEN = '__EMPTY__'
 
@@ -113,6 +116,7 @@ export default function VoiceTranslatePage() {
   )
   const [quickTestBusy, setQuickTestBusy] = useState(false)
   const [replayTtsBusy, setReplayTtsBusy] = useState(false)
+  const [recordingElapsedSec, setRecordingElapsedSec] = useState(0)
 
   const pipelineAbortRef = useRef<AbortController | null>(null)
   const quickTestAbortRef = useRef<AbortController | null>(null)
@@ -141,6 +145,31 @@ export default function VoiceTranslatePage() {
       quickTestAbortRef.current = null
     }
   }, [abortPipeline])
+
+  useEffect(() => {
+    if (!recording) {
+      setRecordingElapsedSec(0)
+      return
+    }
+    setRecordingElapsedSec(0)
+    let cleared = false
+    const id = window.setInterval(() => {
+      if (cleared) return
+      setRecordingElapsedSec((s) => {
+        const next = s + 1
+        if (next >= RECORDING_MAX_SECONDS) {
+          cleared = true
+          window.clearInterval(id)
+          queueMicrotask(() => micActionRef.current())
+        }
+        return next
+      })
+    }, 1000)
+    return () => {
+      cleared = true
+      window.clearInterval(id)
+    }
+  }, [recording])
 
   useEffect(() => {
     setLastDetectedLang('')
@@ -275,6 +304,12 @@ export default function VoiceTranslatePage() {
               blob.type || 'audio/webm',
               sourceLang,
               signal,
+              sourceLang === 'auto'
+                ? {
+                    autoLastDetectedAppCode: lastOneWayAutoSourceLang || undefined,
+                    autoTargetAppCode: targetLang,
+                  }
+                : undefined,
             )
           transcript = tr
           effectiveSource = sourceLang
@@ -351,6 +386,7 @@ export default function VoiceTranslatePage() {
     stopRecordingAndGetBlob,
     playTranslatedTts,
     abortPipeline,
+    lastOneWayAutoSourceLang,
   ])
 
   micActionRef.current = () => {
@@ -736,6 +772,12 @@ export default function VoiceTranslatePage() {
           <div className="voice-viz glass-panel" aria-live="polite">
             <VoiceWaveform levels={safeLevels} />
             <p className="voice-viz__hint">{t('voice.viz.hint')}</p>
+            <p className="voice-viz__timer">
+              {t('voice.viz.timer', {
+                current: recordingElapsedSec,
+                max: RECORDING_MAX_SECONDS,
+              })}
+            </p>
           </div>
         ) : null}
 
