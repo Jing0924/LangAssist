@@ -4,8 +4,6 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import zhTW from './locales/zh-TW.json'
 
-export const UI_LOCALE_STORAGE_KEY = 'voicetranslate-ui-locale'
-
 void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -18,9 +16,8 @@ void i18n
     supportedLngs: ['zh-TW', 'en'],
     interpolation: { escapeValue: false },
     detection: {
-      order: ['localStorage', 'navigator'],
-      caches: ['localStorage'],
-      lookupLocalStorage: UI_LOCALE_STORAGE_KEY,
+      order: ['navigator'],
+      caches: [],
     },
   })
 

@@ -9,7 +9,7 @@
     "voice": "即時語音",
     "vocabulary": "單字學習",
     "news": "科技新聞",
-    "speaking": "口說練習"
+    "speaking": "會話練習"
   },
   "localeSwitcher": {
     "aria": "介面語言",
@@ -136,8 +136,30 @@
     "body": "字卡、複習排程與翻譯 API 整合等功能將在後續版本推出；此頁面為功能預留區。"
   },
   "speakingPage": {
-    "title": "口說練習",
-    "body": "未來可在此進行錄音、語音辨識與發音提示，並沿用本站現有的語音管線；目前為佔位頁面。"
+    "title": "會話練習",
+    "subtitle": "透過 Netlify Function 連線本機 Ollama 進行文字對話（若未把 Ollama 暴露給函式環境，正式雲端託管無法直接使用）。",
+    "chatAria": "會話練習對話",
+    "you": "你",
+    "assistant": "助手",
+    "modelLabel": "模型",
+    "inputLabel": "訊息",
+    "inputPlaceholder": "輸入訊息…",
+    "send": "送出",
+    "stop": "停止",
+    "clear": "清空對話",
+    "newChat": "新對話",
+    "newChatDisabledHint": "請先在此對話送出至少一則訊息，才能建立新對話。",
+    "chatHistory": "對話歷史",
+    "deleteSession": "刪除",
+    "deleteSessionAria": "刪除對話：{{title}}",
+    "sessionsStoredHint": "對話僅存於此瀏覽器（最多 30 則）。",
+    "streaming": "回覆中…",
+    "systemPrompt": "你是口說／會話練習的語伴與助教。請以英文與學習者進行自然、簡短的對話。若表達有誤，先正常接話，再附上一兩點簡短、溫和的改正（必要時）。適時追問以延續話題。請專注於語言練習；若與學習無關、有安全疑慮或超出助教範圍的請求，請婉拒。\n\n當學習者明確要程式或技術範例時，所有程式碼請放在 Markdown 圍欄程式區塊內，開頭一行須標註語言（例如 tsx、ts、bash）。範例盡量短；必要時拆成多個區塊。其餘說明用簡短條列，避免過多層級標題。若對方沒有要程式，以口說練習為主，避免大段程式。",
+    "emptyThread": "送出訊息即可開始。請執行 `ollama serve`、用 `ollama list` 確認已可用的模型，並讓上方模型欄與列表一致（預設為 gpt-oss:120b-cloud）。",
+    "errorNetwork": "無法連線到會話 API。若只跑 Vite，請改為 `netlify dev`，函式才能轉接到本機 Ollama。",
+    "errorTimeout": "串流已停止或逾時。",
+    "errorUpstream": "{{message}}",
+    "errorUnknown": "發生未預期錯誤。"
   },
   "newsPage": {
     "title": "科技新聞",

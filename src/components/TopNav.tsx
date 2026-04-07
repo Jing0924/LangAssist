@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LocaleSwitcher } from './LocaleSwitcher'
 
 const links = [
   { to: '/voice', labelKey: 'nav.voice' as const },
@@ -30,7 +29,6 @@ export function TopNav() {
         </NavLink>
       ))}
       </nav>
-      <LocaleSwitcher />
     </div>
   )
 }

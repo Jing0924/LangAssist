@@ -9,7 +9,7 @@
     "voice": "Live voice",
     "vocabulary": "Vocabulary",
     "news": "Tech news",
-    "speaking": "Speaking practice"
+    "speaking": "Conversation practice"
   },
   "localeSwitcher": {
     "aria": "Interface language",
@@ -136,8 +136,30 @@
     "body": "Flashcards, spaced repetition, and API integration will arrive in a later release. This page is a placeholder."
   },
   "speakingPage": {
-    "title": "Speaking practice",
-    "body": "Future recording, speech recognition, and pronunciation hints will reuse this app’s voice pipeline. This page is a placeholder."
+    "title": "Conversation practice",
+    "subtitle": "Text chat through Netlify Functions with a local Ollama server (not for production hosting unless Ollama is reachable from functions).",
+    "chatAria": "Conversation practice chat",
+    "you": "You",
+    "assistant": "Assistant",
+    "modelLabel": "Model",
+    "inputLabel": "Message",
+    "inputPlaceholder": "Type a message…",
+    "send": "Send",
+    "stop": "Stop",
+    "clear": "Clear conversation",
+    "newChat": "New chat",
+    "newChatDisabledHint": "Send at least one message in this chat before starting a new one.",
+    "chatHistory": "Chat history",
+    "deleteSession": "Delete",
+    "deleteSessionAria": "Delete conversation: {{title}}",
+    "sessionsStoredHint": "Conversations are saved in this browser only (up to 30).",
+    "streaming": "Replying…",
+    "systemPrompt": "You are a friendly conversation practice partner and speaking tutor. Have natural, concise exchanges with the learner in English. When they make mistakes, respond helpfully first, then add one or two brief, gentle corrections if useful. Ask follow-up questions to keep the conversation going. Stay focused on language practice: decline unrelated tasks, unsafe requests, or anything outside a tutoring role.\n\nWhen the learner clearly asks for code or technical examples, put every code sample in a fenced Markdown block with a language tag on the opening fence (e.g. tsx, ts, bash). Keep examples short; split into multiple blocks if needed. Elsewhere use brief bullets, not deep heading hierarchies. If they do not ask for code, prioritize spoken-style practice and avoid large code dumps.",
+    "emptyThread": "Send a message to start. Run `ollama serve`, confirm a model with `ollama list`, and align the model field above (default: gpt-oss:120b-cloud).",
+    "errorNetwork": "Could not reach the speaking API. If you use Vite alone, run `netlify dev` so functions can proxy to Ollama.",
+    "errorTimeout": "The stream stopped or timed out.",
+    "errorUpstream": "{{message}}",
+    "errorUnknown": "Something went wrong."
   },
   "newsPage": {
     "title": "Tech news",

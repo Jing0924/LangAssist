@@ -7,7 +7,7 @@ Current module status:
 - Voice: usable (speech recognition, translation, text-to-speech flow)
 - News: usable (technology headlines with reading/listening practice)
 - Vocabulary: placeholder
-- Speaking: placeholder
+- Speaking: text chat with local Ollama via Netlify Functions (local / `netlify dev` only unless Ollama is reachable from your function runtime)
 
 ## Tech Stack
 
@@ -78,6 +78,18 @@ If you need local Netlify Functions behavior:
 netlify dev
 ```
 
+### Conversation practice (Ollama)
+
+The speaking page streams replies from a local [Ollama](https://ollama.com/) server (`http://127.0.0.1:11434` by default).
+
+1. Install Ollama and run `ollama serve` (or use the Ollama app so the API is up).
+2. Ensure at least one model appears in `ollama list` (local pull or Ollama Cloud). The app defaults to `gpt-oss:120b-cloud`; change the model field to match your list.
+3. Run **`netlify dev`** (not only `npm run dev`) so `/.netlify/functions/speaking-chat` can run and call Ollama on your machine.
+
+Optional: set `OLLAMA_HOST` in the environment (for example in Netlify or a local `.env` loaded by Netlify CLI) if Ollama listens on another URL.
+
+This setup is aimed at **local development**: serverless hosts usually cannot reach `localhost` on your computer.
+
 ## Deployment Notes (Netlify)
 
 - `netlify.toml` points functions to `netlify/functions`.
@@ -96,3 +108,5 @@ netlify dev
   - Verify `NEWSAPI_KEY` is set for your runtime (local Netlify env or Netlify dashboard).
 - Empty translation/voice behavior:
   - Check browser support for Speech APIs and selected language configuration.
+- Speaking chat fails or shows a network error:
+  - Use `netlify dev`, confirm Ollama is running, and that the model name matches what you pulled (`ollama list`).
