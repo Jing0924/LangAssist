@@ -1,73 +1,98 @@
-# React + TypeScript + Vite
+# LangAssist
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+LangAssist is a React + TypeScript web app for language learning practice.
 
-Currently, two official plugins are available:
+Current module status:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Voice: usable (speech recognition, translation, text-to-speech flow)
+- News: usable (technology headlines with reading/listening practice)
+- Vocabulary: placeholder
+- Speaking: placeholder
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Frontend: React, TypeScript, Vite
+- Routing: React Router
+- i18n: i18next + react-i18next
+- Motion/UI: framer-motion
+- Linting: ESLint
+- Optional local function runtime: Netlify Dev
 
-## Expanding the ESLint configuration
+## Project Structure
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `src/`: app pages, components, APIs, i18n resources
+- `netlify/functions/`: serverless functions for deployment/runtime proxy tasks
+- `netlify.toml`: Netlify Functions config (functions directory)
+- `.env.example`: required environment variables template
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Environment Variables
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Copy `.env.example` to `.env` and fill values:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Required keys:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- `VITE_GOOGLE_CLOUD_API_KEY`
+  - Browser-side key for Google Cloud APIs used by the app.
+  - Restrict this key by HTTP referrer and API scope in Google Cloud Console.
+- `NEWSAPI_KEY`
+  - Server-side key for NewsAPI (used by Netlify Functions / local function runtime).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Security notes:
+
+- Do not place service account JSON/private keys in frontend env files.
+- Keep sensitive keys in deployment platform environment settings (for example, Netlify dashboard), not in git.
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
 ```
+
+Run app (Vite):
+
+```bash
+npm run dev
+```
+
+Run lint:
+
+```bash
+npm run lint
+```
+
+Build production bundle:
+
+```bash
+npm run build
+```
+
+If you need local Netlify Functions behavior:
+
+```bash
+netlify dev
+```
+
+## Deployment Notes (Netlify)
+
+- `netlify.toml` points functions to `netlify/functions`.
+- Configure required environment variables in Netlify site settings:
+  - `VITE_GOOGLE_CLOUD_API_KEY`
+  - `NEWSAPI_KEY`
+- Ensure frontend API calls and function paths align with deployed routes.
+
+## Troubleshooting
+
+- Microphone does not work:
+  - Check browser microphone permission and HTTPS requirement (or localhost in dev).
+- Google API request fails:
+  - Confirm API key exists, key restrictions are correct, and required APIs are enabled.
+- News data cannot load:
+  - Verify `NEWSAPI_KEY` is set for your runtime (local Netlify env or Netlify dashboard).
+- Empty translation/voice behavior:
+  - Check browser support for Speech APIs and selected language configuration.

@@ -65,10 +65,11 @@ export default function NewsPage() {
 
   useEffect(() => {
     const ac = new AbortController()
-    setLoading(true)
-    setError(null)
     fetchTechnologyHeadlines(ac.signal)
-      .then(setArticles)
+      .then((rows) => {
+        setArticles(rows)
+        setError(null)
+      })
       .catch((e) => {
         if (isAbortError(e)) return
         setError(e instanceof Error ? e.message : t('api.newsRequestFailed'))
@@ -78,10 +79,7 @@ export default function NewsPage() {
   }, [t])
 
   useEffect(() => {
-    if (!i18n.language.startsWith('zh')) {
-      setZhTitleByKey({})
-      return
-    }
+    if (!i18n.language.startsWith('zh')) return
     const ac = new AbortController()
     const { signal } = ac
     ;(async () => {
