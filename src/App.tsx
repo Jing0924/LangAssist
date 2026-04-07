@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { TopNav } from './components/TopNav'
+import NewsPage from './pages/NewsPage'
 import SpeakingPracticePage from './pages/SpeakingPracticePage'
 import VocabularyPage from './pages/VocabularyPage'
 import VoiceTranslatePage from './pages/VoiceTranslatePage'
@@ -69,6 +70,7 @@ function AppShell() {
           <Route path="/" element={<Navigate to="/voice" replace />} />
           <Route path="/voice" element={<VoiceTranslatePage />} />
           <Route path="/vocabulary" element={<VocabularyPage />} />
+          <Route path="/news" element={<NewsPage />} />
           <Route path="/speaking" element={<SpeakingPracticePage />} />
           <Route path="*" element={<Navigate to="/voice" replace />} />
         </Routes>

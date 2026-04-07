@@ -8,6 +8,7 @@
     "mainAria": "Main navigation",
     "voice": "Live voice",
     "vocabulary": "Vocabulary",
+    "news": "Tech news",
     "speaking": "Speaking practice"
   },
   "localeSwitcher": {
@@ -25,7 +26,10 @@
     "emptyTtsText": "Text to speak is empty",
     "ttsMalformed": "Unexpected text-to-speech response",
     "translateMalformed": "Unexpected translation response",
-    "readAudioFailed": "Could not read audio"
+    "readAudioFailed": "Could not read audio",
+    "newsMissingKey": "Set VITE_NEWSAPI_KEY in a .env file at the project root (NewsAPI developer key).",
+    "newsRequestFailed": "NewsAPI request failed",
+    "newsMalformed": "Unexpected NewsAPI response"
   },
   "languages": {
     "unknown": "—",
@@ -134,5 +138,17 @@
   "speakingPage": {
     "title": "Speaking practice",
     "body": "Future recording, speech recognition, and pronunciation hints will reuse this app’s voice pipeline. This page is a placeholder."
+  },
+  "newsPage": {
+    "title": "Tech news",
+    "subtitle": "Recent English technology headlines (NewsAPI). Each card shows the title and date. Use Play to hear the NewsAPI summary with the browser voice, or open the article link for the full story.",
+    "loading": "Loading headlines…",
+    "empty": "No articles right now.",
+    "untitled": "(No title)",
+    "dateUnknown": "Date unknown",
+    "play": "Play",
+    "stop": "Stop",
+    "openSource": "Open article",
+    "ttsUnsupported": "Speech synthesis is not supported in this browser."
   }
 }

@@ -8,6 +8,7 @@
     "mainAria": "主要功能",
     "voice": "即時語音",
     "vocabulary": "單字學習",
+    "news": "科技新聞",
     "speaking": "口說練習"
   },
   "localeSwitcher": {
@@ -25,7 +26,10 @@
     "emptyTtsText": "朗讀文字為空",
     "ttsMalformed": "語音合成回應格式異常",
     "translateMalformed": "翻譯回應格式異常",
-    "readAudioFailed": "無法讀取音訊"
+    "readAudioFailed": "無法讀取音訊",
+    "newsMissingKey": "請在專案根目錄 .env 設定 VITE_NEWSAPI_KEY（NewsAPI 開發者金鑰）。",
+    "newsRequestFailed": "NewsAPI 請求失敗",
+    "newsMalformed": "NewsAPI 回應格式異常"
   },
   "languages": {
     "unknown": "—",
@@ -134,5 +138,17 @@
   "speakingPage": {
     "title": "口說練習",
     "body": "未來可在此進行錄音、語音辨識與發音提示，並沿用本站現有的語音管線；目前為佔位頁面。"
+  },
+  "newsPage": {
+    "title": "科技新聞",
+    "subtitle": "近期英文科技頭條（NewsAPI）；卡片顯示標題與日期。點「播放」可朗讀 NewsAPI 摘要；開啟原文連結可閱讀完整報導。",
+    "loading": "載入新聞中…",
+    "empty": "目前沒有文章。",
+    "untitled": "（無標題）",
+    "dateUnknown": "日期不詳",
+    "play": "播放",
+    "stop": "停止",
+    "openSource": "原文",
+    "ttsUnsupported": "此瀏覽器不支援語音朗讀。"
   }
 }

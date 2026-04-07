@@ -5,6 +5,7 @@ import { LocaleSwitcher } from './LocaleSwitcher'
 const links = [
   { to: '/voice', labelKey: 'nav.voice' as const },
   { to: '/vocabulary', labelKey: 'nav.vocabulary' as const },
+  { to: '/news', labelKey: 'nav.news' as const },
   { to: '/speaking', labelKey: 'nav.speaking' as const },
 ] as const
 
