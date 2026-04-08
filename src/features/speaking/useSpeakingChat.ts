@@ -8,7 +8,6 @@ export type UseSpeakingChatOptions = {
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   model: string;
-  setModel: (value: string) => void;
   /** When this changes (e.g. active session id), streaming stops and the composer resets. */
   sessionKey: string;
 };
@@ -19,7 +18,6 @@ export function useSpeakingChat({
   messages,
   setMessages,
   model,
-  setModel,
   sessionKey,
 }: UseSpeakingChatOptions) {
   const { t } = useTranslation();
@@ -48,7 +46,7 @@ export function useSpeakingChat({
     setMessages([]);
     setInput("");
     setError(null);
-  }, [cancelStream]);
+  }, [cancelStream, setMessages]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -137,14 +135,12 @@ export function useSpeakingChat({
       abortRef.current = null;
       setIsStreaming(false);
     }
-  }, [input, isStreaming, messages, model, t]);
+  }, [input, isStreaming, messages, model, setMessages, t]);
 
   return {
     messages,
     input,
     setInput,
-    model,
-    setModel,
     isStreaming,
     error,
     sendMessage,

@@ -15,7 +15,6 @@ export default function SpeakingPracticePage() {
     messages,
     setMessages,
     model,
-    setModel,
     switchSession,
     createSession,
     deleteSession,
@@ -33,7 +32,6 @@ export default function SpeakingPracticePage() {
     messages,
     setMessages,
     model,
-    setModel,
     sessionKey: activeId,
   });
 
@@ -294,15 +292,12 @@ export default function SpeakingPracticePage() {
               <span className="speaking-page__model-label-text">
                 {t("speakingPage.modelLabel")}
               </span>
-              <input
+              <output
                 className="speaking-page__model-input"
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                disabled={isStreaming}
-                autoComplete="off"
-                spellCheck={false}
-              />
+                aria-live="polite"
+              >
+                {model}
+              </output>
             </label>
 
             <label className="sr-only" htmlFor="speaking-input">

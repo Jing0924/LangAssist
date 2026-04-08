@@ -1,7 +1,8 @@
 /**
- * Proxies chat to a local Ollama instance (default http://127.0.0.1:11434).
- * For local dev use `ollama serve` and `netlify dev`; this is not suitable for
- * public serverless deployment unless Ollama is reachable from the function runtime.
+ * Proxies conversation practice chat to Gemini.
+ * Keeps the existing frontend contract:
+ * - non-stream: { reply }
+ * - stream (SSE): data: {"c":"..."} ... data: {"done":true}
  */
 
 type ChatRole = 'system' | 'user' | 'assistant'
@@ -13,7 +14,18 @@ type IncomingBody = {
   stream?: unknown
 }
 
-const OLLAMA_BASE_DEFAULT = 'http://127.0.0.1:11434'
+type GeminiRole = 'user' | 'model'
+
+type GeminiPart = { text: string }
+type GeminiMessage = { role: GeminiRole; parts: GeminiPart[] }
+type GeminiContentRoot = { parts: GeminiPart[] }
+type GeminiGenerateResponse = {
+  candidates?: Array<{ content?: GeminiContentRoot }>
+  error?: { message?: string }
+}
+type GeminiErrorResponse = {
+  error?: { message?: string }
+}
 
 function json(statusCode: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -25,17 +37,32 @@ function json(statusCode: number, body: unknown): Response {
   })
 }
 
-function ollamaBase(): string {
-  const fromEnv = process.env.OLLAMA_HOST?.trim() || process.env.OLLAMA_URL?.trim()
-  if (fromEnv) {
-    return fromEnv.replace(/\/$/, '')
+function geminiApiKey(): string | null {
+  const key = process.env.GEMINI_API_KEY?.trim()
+  return key || null
+}
+
+function geminiApiBase(): string {
+  const base = process.env.GEMINI_API_BASE?.trim()
+  if (base) {
+    return base.replace(/\/$/, '')
   }
-  return OLLAMA_BASE_DEFAULT
+  return 'https://generativelanguage.googleapis.com/v1beta'
 }
 
 function validate(
   raw: IncomingBody,
-): { ok: true; data: { model: string; messages: { role: ChatRole; content: string }[]; temperature?: number; stream: boolean } } | { ok: false; response: Response } {
+):
+  | {
+      ok: true
+      data: {
+        model: string
+        messages: { role: ChatRole; content: string }[]
+        temperature?: number
+        stream: boolean
+      }
+    }
+  | { ok: false; response: Response } {
   if (typeof raw.model !== 'string' || !raw.model.trim()) {
     return { ok: false, response: json(400, { message: 'model is required' }) }
   }
@@ -72,52 +99,166 @@ function validate(
   }
 }
 
+function mapToGemini(
+  messages: { role: ChatRole; content: string }[],
+): { contents: GeminiMessage[]; systemInstruction?: GeminiContentRoot } {
+  const systemTexts: string[] = []
+  const contents: GeminiMessage[] = []
+
+  for (const message of messages) {
+    if (message.role === 'system') {
+      if (message.content.trim()) {
+        systemTexts.push(message.content)
+      }
+      continue
+    }
+    contents.push({
+      role: message.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: message.content }],
+    })
+  }
+
+  if (contents.length === 0) {
+    contents.push({ role: 'user', parts: [{ text: '' }] })
+  }
+
+  if (systemTexts.length === 0) {
+    return { contents }
+  }
+
+  return {
+    contents,
+    systemInstruction: {
+      parts: [{ text: systemTexts.join('\n\n') }],
+    },
+  }
+}
+
+function buildGenerateBody(
+  messages: { role: ChatRole; content: string }[],
+  temperature: number | undefined,
+): Record<string, unknown> {
+  const mapped = mapToGemini(messages)
+  const body: Record<string, unknown> = { contents: mapped.contents }
+  if (mapped.systemInstruction) {
+    body.systemInstruction = mapped.systemInstruction
+  }
+  if (temperature !== undefined) {
+    body.generationConfig = { temperature }
+  }
+  return body
+}
+
+function mapUpstreamStatus(status: number): number {
+  if (status >= 400 && status < 600) {
+    return status
+  }
+  return 502
+}
+
+function parseGeminiErrorText(raw: string): string | null {
+  if (!raw.trim()) {
+    return null
+  }
+  try {
+    const parsed = JSON.parse(raw) as GeminiErrorResponse
+    const message = parsed.error?.message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  } catch {
+    /* ignore parse error */
+  }
+  return raw.trim() || null
+}
+
+function extractGeminiText(payload: GeminiGenerateResponse): string {
+  const parts = payload.candidates?.[0]?.content?.parts
+  if (!Array.isArray(parts)) {
+    return ''
+  }
+  return parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('')
+}
+
+function geminiGenerateUrl(base: string, model: string, key: string): string {
+  return `${base}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`
+}
+
+function geminiStreamUrl(base: string, model: string, key: string): string {
+  return `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`
+}
+
+function parseGeminiChunkText(rawData: string): string {
+  if (!rawData.trim()) {
+    return ''
+  }
+  try {
+    const parsed = JSON.parse(rawData) as GeminiGenerateResponse
+    return extractGeminiText(parsed)
+  } catch {
+    return ''
+  }
+}
+
+function readSseDataEvents(chunk: string, pending: { value: string }): string[] {
+  pending.value += chunk
+  const segments = pending.value.split('\n\n')
+  pending.value = segments.pop() ?? ''
+
+  const events: string[] = []
+  for (const segment of segments) {
+    const dataLines = segment
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .filter(Boolean)
+
+    if (dataLines.length > 0) {
+      events.push(dataLines.join('\n'))
+    }
+  }
+
+  return events
+}
+
 async function handleNonStream(
   base: string,
+  key: string,
   model: string,
   messages: { role: ChatRole; content: string }[],
   temperature: number | undefined,
 ): Promise<Response> {
-  const options: Record<string, number> = {}
-  if (temperature !== undefined) {
-    options.temperature = temperature
-  }
   let upstream: Response
   try {
-    upstream = await fetch(`${base}/api/chat`, {
+    upstream = await fetch(geminiGenerateUrl(base, model, key), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        ...(Object.keys(options).length > 0 ? { options } : {}),
-      }),
+      body: JSON.stringify(buildGenerateBody(messages, temperature)),
     })
   } catch {
     return json(502, {
-      message:
-        'Could not reach Ollama. Start it with `ollama serve` and ensure the model is pulled.',
+      message: 'Could not reach Gemini API. Verify network and GEMINI_API_KEY.',
     })
   }
-  const data = (await upstream.json().catch(() => ({}))) as {
-    message?: { role?: string; content?: unknown }
-    error?: string
-  }
+
+  const rawBody = await upstream.text().catch(() => '')
   if (!upstream.ok) {
-    const msg =
-      typeof data.error === 'string' && data.error.trim()
-        ? data.error
-        : 'Ollama returned an error'
-    return json(upstream.status >= 400 && upstream.status < 600 ? upstream.status : 502, {
-      message: msg,
-    })
+    const message = parseGeminiErrorText(rawBody) || 'Gemini returned an error'
+    return json(mapUpstreamStatus(upstream.status), { message })
   }
-  const text =
-    typeof data.message?.content === 'string' ? data.message.content : ''
+
+  let parsed: GeminiGenerateResponse = {}
+  try {
+    parsed = JSON.parse(rawBody) as GeminiGenerateResponse
+  } catch {
+    /* keep empty object */
+  }
+
+  const text = extractGeminiText(parsed).trim()
   if (!text) {
-    return json(502, { message: 'Malformed response from Ollama' })
+    return json(502, { message: 'Malformed response from Gemini' })
   }
+
   const reply = {
     id: crypto.randomUUID(),
     role: 'assistant' as const,
@@ -129,60 +270,38 @@ async function handleNonStream(
 
 function handleStream(
   base: string,
+  key: string,
   model: string,
   messages: { role: ChatRole; content: string }[],
   temperature: number | undefined,
 ): Promise<Response> {
-  const options: Record<string, number> = {}
-  if (temperature !== undefined) {
-    options.temperature = temperature
-  }
-
   return (async () => {
     let upstream: Response
     try {
-      upstream = await fetch(`${base}/api/chat`, {
+      upstream = await fetch(geminiStreamUrl(base, model, key), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages,
-          stream: true,
-          ...(Object.keys(options).length > 0 ? { options } : {}),
-        }),
+        body: JSON.stringify(buildGenerateBody(messages, temperature)),
       })
     } catch {
       return json(502, {
-        message:
-          'Could not reach Ollama. Start it with `ollama serve` and ensure the model is pulled.',
+        message: 'Could not reach Gemini API. Verify network and GEMINI_API_KEY.',
       })
     }
 
     if (!upstream.ok) {
       const errBody = (await upstream.text().catch(() => '')).trim()
-      let message = 'Ollama request failed'
-      try {
-        const j = JSON.parse(errBody) as { error?: string }
-        if (typeof j.error === 'string' && j.error.trim()) {
-          message = j.error
-        }
-      } catch {
-        if (errBody) {
-          message = errBody
-        }
-      }
-      return json(upstream.status >= 400 && upstream.status < 600 ? upstream.status : 502, {
-        message,
-      })
+      const message = parseGeminiErrorText(errBody) || 'Gemini request failed'
+      return json(mapUpstreamStatus(upstream.status), { message })
     }
 
     if (!upstream.body) {
-      return json(502, { message: 'Ollama returned an empty body' })
+      return json(502, { message: 'Gemini returned an empty body' })
     }
 
     const encoder = new TextEncoder()
     const decoder = new TextDecoder()
-    let lineBuf = ''
+    const pending = { value: '' }
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -190,52 +309,31 @@ function handleStream(
         try {
           while (true) {
             const { done, value } = await reader.read()
-            if (done) break
-            lineBuf += decoder.decode(value, { stream: true })
-            const parts = lineBuf.split('\n')
-            lineBuf = parts.pop() ?? ''
-            for (const line of parts) {
-              const trimmed = line.trim()
-              if (!trimmed) continue
-              let parsed: unknown
-              try {
-                parsed = JSON.parse(trimmed)
-              } catch {
-                continue
-              }
-              if (!parsed || typeof parsed !== 'object') continue
-              const rec = parsed as Record<string, unknown>
-              const msg = rec.message
-              if (!msg || typeof msg !== 'object') continue
-              const piece = (msg as Record<string, unknown>).content
-              if (typeof piece === 'string' && piece.length > 0) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ c: piece })}\n\n`),
-                )
+            if (done) {
+              break
+            }
+            const textChunk = decoder.decode(value, { stream: true })
+            const events = readSseDataEvents(textChunk, pending)
+            for (const eventData of events) {
+              const piece = parseGeminiChunkText(eventData)
+              if (piece) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ c: piece })}\n\n`))
               }
             }
           }
-          const tail = lineBuf.trim()
-          if (tail) {
-            try {
-              const parsed = JSON.parse(tail) as Record<string, unknown>
-              const msg = parsed.message
-              if (msg && typeof msg === 'object') {
-                const piece = (msg as Record<string, unknown>).content
-                if (typeof piece === 'string' && piece.length > 0) {
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ c: piece })}\n\n`),
-                  )
-                }
-              }
-            } catch {
-              /* ignore trailing garbage */
+
+          const tailEvents = readSseDataEvents('\n\n', pending)
+          for (const eventData of tailEvents) {
+            const piece = parseGeminiChunkText(eventData)
+            if (piece) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ c: piece })}\n\n`))
             }
           }
+
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
           controller.close()
-        } catch (e) {
-          controller.error(e)
+        } catch (error) {
+          controller.error(error)
         }
       },
     })
@@ -271,11 +369,16 @@ export default async function handler(request: Request): Promise<Response> {
     return validated.response
   }
 
+  const key = geminiApiKey()
+  if (!key) {
+    return json(500, { message: 'Missing GEMINI_API_KEY' })
+  }
+
   const { model, messages, temperature, stream } = validated.data
-  const base = ollamaBase()
+  const base = geminiApiBase()
 
   if (stream) {
-    return handleStream(base, model, messages, temperature)
+    return handleStream(base, key, model, messages, temperature)
   }
-  return handleNonStream(base, model, messages, temperature)
+  return handleNonStream(base, key, model, messages, temperature)
 }

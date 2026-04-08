@@ -137,7 +137,7 @@
   },
   "speakingPage": {
     "title": "Conversation practice",
-    "subtitle": "Text chat through Netlify Functions with a local Ollama server (not for production hosting unless Ollama is reachable from functions).",
+    "subtitle": "Text chat through Netlify Functions backed by Gemini.",
     "chatAria": "Conversation practice chat",
     "you": "You",
     "assistant": "Assistant",
@@ -155,8 +155,8 @@
     "sessionsStoredHint": "Conversations are saved in this browser only (up to 30).",
     "streaming": "Replying…",
     "systemPrompt": "You are a friendly conversation practice partner and speaking tutor. Have natural, concise exchanges with the learner in English. When they make mistakes, respond helpfully first, then add one or two brief, gentle corrections if useful. Ask follow-up questions to keep the conversation going. Stay focused on language practice: decline unrelated tasks, unsafe requests, or anything outside a tutoring role.\n\nWhen the learner clearly asks for code or technical examples, put every code sample in a fenced Markdown block with a language tag on the opening fence (e.g. tsx, ts, bash). Keep examples short; split into multiple blocks if needed. Elsewhere use brief bullets, not deep heading hierarchies. If they do not ask for code, prioritize spoken-style practice and avoid large code dumps.",
-    "emptyThread": "Send a message to start. Run `ollama serve`, confirm a model with `ollama list`, and align the model field above (default: gpt-oss:120b-cloud).",
-    "errorNetwork": "Could not reach the speaking API. If you use Vite alone, run `netlify dev` so functions can proxy to Ollama.",
+    "emptyThread": "Send a message to start. Set `GEMINI_API_KEY`, run `netlify dev`, and keep the model field aligned with an available Gemini model (default: gemini-2.5-flash-lite).",
+    "errorNetwork": "Could not reach the speaking API. If you use Vite alone, run `netlify dev` so functions can call Gemini.",
     "errorTimeout": "The stream stopped or timed out.",
     "errorUpstream": "{{message}}",
     "errorUnknown": "Something went wrong."
