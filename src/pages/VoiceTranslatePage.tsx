@@ -1,14 +1,13 @@
 import { motion } from 'framer-motion'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Trans, useTranslation } from 'react-i18next'
-import { isAbortError } from '../abortError'
+import { isAbortError } from '../shared/lib/abortError'
 import {
   blobToBase64,
   detectLanguage,
   recognizeSpeech,
   speechLanguageCode,
   translateText,
-} from '../api'
+} from '../shared/api/speechTranslateApi'
 import { useMagnetic } from '../hooks/useMagnetic'
 import { useTtsPlayback } from '../hooks/useTtsPlayback'
 import { useTypewriter } from '../hooks/useTypewriter'
@@ -20,7 +19,7 @@ import {
   languageLabel,
   normalizeGoogleLangToAppCode,
   resolveBidirectionalTranslatePair,
-} from '../languages'
+} from '../shared/lib/languages'
 
 /** Sync `recognize` 對過長音檔較不穩定；達上限則自動停止並辨識。 */
 const RECORDING_MAX_SECONDS = 60
@@ -42,6 +41,77 @@ type ProcessingStep = 'recognizing' | 'translating' | 'speaking'
 type UiPhase = 'idle' | 'listening' | ProcessingStep
 
 type TranslateMode = 'oneWay' | 'bidirectional'
+
+const UI_TEXT: Record<string, string> = {
+  'voice.viz.waveformAria': '音量波形',
+  'voice.status.listening': '聆聽中',
+  'voice.status.recognizing': '辨識中',
+  'voice.status.translating': '翻譯中',
+  'voice.status.speaking': '播放語音中',
+  'voice.status.idle': '待機中',
+  'voice.bubble.fallbackDetectedSession': '本次辨識',
+  'voice.bubble.fallbackTranslationSession': '本次譯文',
+  'voice.emptyTranscript': '（無辨識內容）',
+  'voice.pageAria': '語音即時翻譯',
+  'voice.toolbar.title': '語音即時翻譯',
+  'voice.toolbar.subtitle': '空白鍵或下方麥克風開始／結束收音',
+  'voice.langBarAria': '語言設定',
+  'voice.mode.groupAria': '翻譯模式',
+  'voice.mode.oneWay': '單向',
+  'voice.mode.bidirectional': '雙向對話',
+  'voice.lang.source': '來源語言',
+  'voice.lang.target': '目標語言',
+  'voice.lang.pairA': '語言 A（主辨識）',
+  'voice.lang.pairB': '語言 B（輔辨識）',
+  'voice.swap.titleAuto': '自動偵測時無法交換',
+  'voice.swap.titleOneWay': '交換來源與目標語言',
+  'voice.swap.ariaOneWay': '交換來源與目標語言',
+  'voice.pairSelect.aTitle': '語音辨識主語言（可多語時影響偏置，可與 B 交換）',
+  'voice.swap.titleBidirectional': '交換語言 A/B（主／輔辨識）',
+  'voice.swap.ariaBidirectional': '交換雙向語言 A 與 B',
+  'voice.pairSelect.bTitle': '替代辨識語言',
+  'voice.viz.hint': '系統正在收音，結束時再按一次或按空白鍵',
+  'voice.chatAria': '對話',
+  'voice.bubble.you': '你',
+  'voice.bubble.titleDetectedThisRound': '本次辨識語言',
+  'voice.bubble.replaySourceAria': '重播原文朗讀',
+  'voice.bubble.replaySourceTitle': '重播原文朗讀',
+  'voice.bubble.placeholderSource': '原文會顯示在這裡；點擊麥克風或按空白鍵開始說話。',
+  'voice.bubble.translation': '譯文',
+  'voice.bubble.titleTranslationThisRound': '本次朗讀／譯文語言',
+  'voice.bubble.replayTranslationAria': '重播譯文朗讀',
+  'voice.bubble.replayTranslationTitle': '重播譯文朗讀',
+  'voice.bubble.placeholderTranslation': '譯文會以對話氣泡顯示，並在完成後自動朗讀。',
+  'voice.quickTest.aria': 'API 快速測試',
+  'voice.quickTest.testing': '測試中…',
+  'voice.quickTest.button': '快速測試翻譯 API',
+  'voice.quickTest.metaOneWayLead': '使用目前「目標語言」；',
+  'voice.controls.micStop': '停止並辨識翻譯',
+  'voice.controls.micStart': '開始錄音',
+  'voice.controls.processingRecognizing': '語音辨識進行中…',
+  'voice.controls.processingTranslating': '翻譯進行中…',
+  'voice.controls.processingSpeaking': '播放譯文朗讀…',
+  'voice.controls.processingGeneric': '處理中…',
+  'voice.controls.recordingStop': '再次點擊或空白鍵結束錄音',
+  'voice.controls.idleCredentials': '空白鍵或點擊麥克風開始；憑證為 API 金鑰，詳見 .env.example',
+  'voice.hints.noAudioBlob': '沒有錄到音訊，請再試一次。',
+  'voice.hints.emptyRecognize': '辨識結果為空，請靠近麥克風或說大聲一點。',
+  'voice.hints.bidirectionalUnknown': '無法判斷為已選的兩種語言之一，請再試一次或交換語言 A/B（主／輔辨識）。',
+  'voice.hints.ttsAfterTranslate': '翻譯完成，但朗讀失敗：{{message}}',
+  'voice.hints.micDenied': '無法存取麥克風，請確認瀏覽器權限。',
+  'voice.hints.sourceReplayFailed': '原文朗讀失敗：{{message}}',
+  'voice.hints.translationReplayFailed': '譯文朗讀失敗：{{message}}',
+  'voice.quickTest.metaBidirectionalLead': '使用目前雙向配對的語言 B（{{label}}）；',
+  'voice.quickTest.success': '成功：{{result}}',
+  'voice.quickTest.error': '失敗：{{message}}',
+  'voice.viz.timer': '{{current}} / {{max}} 秒（達上限將自動停止並辨識）',
+}
+
+function t(key: string, vars?: Record<string, string | number>): string {
+  const template = UI_TEXT[key] ?? key
+  if (!vars) return template
+  return template.replace(/\{\{(\w+)\}\}/g, (_, token) => String(vars[token] ?? ''))
+}
 
 function derivePhase(
   recording: boolean,
@@ -73,7 +143,6 @@ function StreamedText({
 }
 
 function VoiceWaveform({ levels }: { levels: number[] }) {
-  const { t } = useTranslation()
   return (
     <div className="voice-viz__bars" role="img" aria-label={t('voice.viz.waveformAria')}>
       {levels.map((lv, i) => (
@@ -91,7 +160,6 @@ function VoiceWaveform({ levels }: { levels: number[] }) {
 }
 
 export default function VoiceTranslatePage() {
-  const { t } = useTranslation()
   const id = useId()
   const [recording, setRecording] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -474,16 +542,16 @@ export default function VoiceTranslatePage() {
   const bubbleOutLangTag =
     translateMode === 'bidirectional'
       ? lastDetectedLang
-        ? languageLabel(lastDetectedLang, t)
+        ? languageLabel(lastDetectedLang)
         : t('voice.bubble.fallbackDetectedSession')
-      : languageLabel(sourceLang, t)
+      : languageLabel(sourceLang)
 
   const bubbleInLangTag =
     translateMode === 'bidirectional'
       ? lastTargetLang
-        ? languageLabel(lastTargetLang, t)
+        ? languageLabel(lastTargetLang)
         : t('voice.bubble.fallbackTranslationSession')
-      : languageLabel(targetLang, t)
+      : languageLabel(targetLang)
 
   const ttsReplayLang =
     translateMode === 'bidirectional' ? lastTargetLang : targetLang
@@ -663,7 +731,7 @@ export default function VoiceTranslatePage() {
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {t(`languages.codes.${l.code}`)}
+                    {languageLabel(l.code)}
                   </option>
                 ))}
               </select>
@@ -703,7 +771,7 @@ export default function VoiceTranslatePage() {
               >
                 {LANGUAGES.filter((l) => l.code !== 'auto').map((l) => (
                   <option key={l.code} value={l.code}>
-                    {t(`languages.codes.${l.code}`)}
+                    {languageLabel(l.code)}
                   </option>
                 ))}
               </select>
@@ -723,7 +791,7 @@ export default function VoiceTranslatePage() {
               >
                 {PAIR_LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {t(`languages.codes.${l.code}`)}
+                    {languageLabel(l.code)}
                   </option>
                 ))}
               </select>
@@ -760,7 +828,7 @@ export default function VoiceTranslatePage() {
               >
                 {PAIR_LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {t(`languages.codes.${l.code}`)}
+                    {languageLabel(l.code)}
                   </option>
                 ))}
               </select>
@@ -915,15 +983,11 @@ export default function VoiceTranslatePage() {
             <span className="quick-test__meta">
               {translateMode === 'bidirectional'
                 ? t('voice.quickTest.metaBidirectionalLead', {
-                    label: languageLabel(pairLangB, t),
+                    label: languageLabel(pairLangB),
                   })
                 : t('voice.quickTest.metaOneWayLead')}
-              <Trans
-                i18nKey="voice.quickTest.metaEnv"
-                components={{
-                  code: <code className="quick-test__code" />,
-                }}
-              />
+              需已在根目錄 <code className="quick-test__code">.env</code> 設定{' '}
+              <code className="quick-test__code">VITE_GOOGLE_CLOUD_API_KEY</code>
             </span>
           </div>
           {quickTestResult ? (

@@ -1,32 +1,15 @@
 import { useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { TopNav } from './components/TopNav'
-import NewsPage from './pages/NewsPage'
 import SpeakingPracticePage from './pages/SpeakingPracticePage'
-import VocabularyPage from './pages/VocabularyPage'
 import VoiceTranslatePage from './pages/VoiceTranslatePage'
 import './App.css'
 
-function documentLangFromUi(uiLng: string): string {
-  return uiLng.startsWith('en') ? 'en' : 'zh-Hant'
-}
-
 function AppShell() {
-  const { t, i18n } = useTranslation()
-
   useEffect(() => {
-    const apply = (lng: string) => {
-      document.documentElement.lang = documentLangFromUi(lng)
-      document.title = i18n.t('app.documentTitle')
-    }
-    apply(i18n.language)
-    const onLang = (lng: string) => apply(lng)
-    i18n.on('languageChanged', onLang)
-    return () => {
-      i18n.off('languageChanged', onLang)
-    }
-  }, [i18n])
+    document.documentElement.lang = 'zh-Hant'
+    document.title = 'LangAssist — 語言輔助'
+  }, [])
 
   return (
     <div className="app-shell">
@@ -59,8 +42,8 @@ function AppShell() {
               </svg>
             </span>
             <div>
-              <h1 className="brand__title">{t('app.brandTitle')}</h1>
-              <p className="brand__tagline">{t('app.tagline')}</p>
+              <h1 className="brand__title">LangAssist</h1>
+              <p className="brand__tagline">語言輔助 · VoiceTranslate</p>
             </div>
           </div>
           <TopNav />
@@ -69,8 +52,7 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Navigate to="/voice" replace />} />
           <Route path="/voice" element={<VoiceTranslatePage />} />
-          <Route path="/vocabulary" element={<VocabularyPage />} />
-          <Route path="/news" element={<NewsPage />} />
+          <Route path="/vocabulary" element={<Navigate to="/voice" replace />} />
           <Route path="/speaking" element={<SpeakingPracticePage />} />
           <Route path="*" element={<Navigate to="/voice" replace />} />
         </Routes>

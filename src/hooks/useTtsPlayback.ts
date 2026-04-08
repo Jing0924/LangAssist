@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { synthesizeSpeechMp3Base64 } from '../api'
+import { synthesizeSpeechMp3Base64 } from '../shared/api/speechTranslateApi'
 
 function abortPromise(signal: AbortSignal): Promise<never> {
   return new Promise((_, reject) => {

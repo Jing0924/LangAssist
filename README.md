@@ -5,15 +5,12 @@ LangAssist is a React + TypeScript web app for language learning practice.
 Current module status:
 
 - Voice: usable (speech recognition, translation, text-to-speech flow)
-- News: usable (technology headlines with reading/listening practice)
-- Vocabulary: placeholder
 - Speaking: text chat with Gemini (browser-side API call)
 
 ## Tech Stack
 
 - Frontend: React, TypeScript, Vite
 - Routing: React Router
-- i18n: i18next + react-i18next
 - Motion/UI: framer-motion
 - Linting: ESLint
 
@@ -35,9 +32,6 @@ Required keys:
 - `VITE_GOOGLE_CLOUD_API_KEY`
   - Browser-side key for Google Cloud APIs used by the app.
   - Restrict this key by HTTP referrer and API scope in Google Cloud Console.
-- `VITE_NEWSAPI_KEY`
-  - Browser-side key for NewsAPI.
-  - Restrict this key by HTTP referrer and NewsAPI usage policy.
 - `VITE_GEMINI_API_KEY`
   - Browser-side key for Gemini Generate Content API.
   - Restrict this key by HTTP referrer and API scope.
@@ -87,8 +81,6 @@ The speaking page streams replies from the Gemini Generate Content API.
   - Check browser microphone permission and HTTPS requirement (or localhost in dev).
 - Google API request fails:
   - Confirm API key exists, key restrictions are correct, and required APIs are enabled.
-- News data cannot load:
-  - Verify `VITE_NEWSAPI_KEY` is set in `.env`, then restart the dev server.
 - Empty translation/voice behavior:
   - Check browser support for Speech APIs and selected language configuration.
 - Speaking chat fails or shows a network error:

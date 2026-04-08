@@ -1,20 +1,15 @@
 import { NavLink } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 
 const links = [
-  { to: '/voice', labelKey: 'nav.voice' as const },
-  { to: '/vocabulary', labelKey: 'nav.vocabulary' as const },
-  { to: '/news', labelKey: 'nav.news' as const },
-  { to: '/speaking', labelKey: 'nav.speaking' as const },
+  { to: '/voice', label: '即時語音' },
+  { to: '/speaking', label: '會話練習' },
 ] as const
 
 export function TopNav() {
-  const { t } = useTranslation()
-
   return (
     <div className="site-header__actions">
-      <nav className="top-nav" aria-label={t('nav.mainAria')}>
-      {links.map(({ to, labelKey }) => (
+      <nav className="top-nav" aria-label="主要功能">
+      {links.map(({ to, label }) => (
         <NavLink
           key={to}
           to={to}
@@ -25,7 +20,7 @@ export function TopNav() {
           }
           end
         >
-          {t(labelKey)}
+          {label}
         </NavLink>
       ))}
       </nav>

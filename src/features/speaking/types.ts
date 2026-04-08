@@ -29,7 +29,7 @@ export interface SpeakingChatError extends Error {
   code: SpeakingChatErrorCode;
 }
 
-/** `title === null` → show i18n default label until first user message sets a snippet. */
+/** `title === null` → show default label until first user message sets a snippet. */
 export interface SpeakingSession {
   id: string;
   title: string | null;

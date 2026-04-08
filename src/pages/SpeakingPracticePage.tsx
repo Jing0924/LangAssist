@@ -1,6 +1,5 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { useTranslation } from "react-i18next";
 import { AssistantMarkdown } from "../features/speaking/AssistantMarkdown";
 import { useSpeakingChat } from "../features/speaking/useSpeakingChat";
 import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSessionStore";
@@ -8,7 +7,6 @@ import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSession
 const NEAR_BOTTOM_PX = 80;
 
 export default function SpeakingPracticePage() {
-  const { t, i18n } = useTranslation();
   const {
     sessions,
     activeId,
@@ -72,11 +70,11 @@ export default function SpeakingPracticePage() {
 
   const dateFmt = useMemo(
     () =>
-      new Intl.DateTimeFormat(i18n.language || undefined, {
+      new Intl.DateTimeFormat("zh-TW", {
         dateStyle: "short",
         timeStyle: "short",
       }),
-    [i18n.language],
+    [],
   );
 
   const sendAfterScrollFlag = () => {
@@ -121,8 +119,8 @@ export default function SpeakingPracticePage() {
     <div className="speaking-page">
       <header className="glass-panel glass-panel--header speaking-page__toolbar">
         <div className="speaking-page__intro">
-          <h2 className="speaking-page__title">{t("speakingPage.title")}</h2>
-          <p className="speaking-page__subtitle">{t("speakingPage.subtitle")}</p>
+          <h2 className="speaking-page__title">會話練習</h2>
+          <p className="speaking-page__subtitle">在前端直接串接 Gemini 進行文字對話。</p>
         </div>
         <button
           type="button"
@@ -130,22 +128,22 @@ export default function SpeakingPracticePage() {
           onClick={clearConversation}
           disabled={clearDisabled}
         >
-          {t("speakingPage.clear")}
+          清空對話
         </button>
       </header>
 
       <div className="speaking-page__layout">
         <aside
           className="glass-panel speaking-page__sidebar"
-          aria-label={t("speakingPage.chatHistory")}
+          aria-label="對話歷史"
         >
           <div className="speaking-page__sidebar-head">
             <h3 className="speaking-page__sidebar-title">
-              {t("speakingPage.chatHistory")}
+              對話歷史
             </h3>
             {newChatDisabled ? (
               <span id="speaking-new-chat-disabled-hint" className="sr-only">
-                {t("speakingPage.newChatDisabledHint")}
+                請先在此對話送出至少一則訊息，才能建立新對話。
               </span>
             ) : null}
             <button
@@ -155,23 +153,23 @@ export default function SpeakingPracticePage() {
               disabled={newChatDisabled}
               title={
                 newChatDisabled
-                  ? t("speakingPage.newChatDisabledHint")
+                  ? "請先在此對話送出至少一則訊息，才能建立新對話。"
                   : undefined
               }
               aria-describedby={
                 newChatDisabled ? "speaking-new-chat-disabled-hint" : undefined
               }
             >
-              {t("speakingPage.newChat")}
+              新對話
             </button>
           </div>
           <p className="speaking-page__sessions-hint">
-            {t("speakingPage.sessionsStoredHint")}
+            對話僅存於此瀏覽器（最多 30 則）。
           </p>
           <ul className="speaking-page__session-list" role="list">
             {sessions.map((s) => {
               const isActive = s.id === activeId;
-              const label = s.title ?? t("speakingPage.newChat");
+              const label = s.title ?? "新對話";
               return (
                 <li key={s.id} className="speaking-page__session-li">
                   <div
@@ -199,11 +197,9 @@ export default function SpeakingPracticePage() {
                         e.stopPropagation();
                         onDeleteSession(s.id);
                       }}
-                      aria-label={t("speakingPage.deleteSessionAria", {
-                        title: label,
-                      })}
+                      aria-label={`刪除對話：${label}`}
                     >
-                      {t("speakingPage.deleteSession")}
+                      刪除
                     </button>
                   </div>
                 </li>
@@ -217,7 +213,7 @@ export default function SpeakingPracticePage() {
           aria-labelledby="speaking-heading"
         >
           <h2 id="speaking-heading" className="sr-only">
-            {t("speakingPage.title")}
+            會話練習
           </h2>
 
           {error ? (
@@ -228,7 +224,7 @@ export default function SpeakingPracticePage() {
 
           <section
             className="chat-thread speaking-page__thread"
-            aria-label={t("speakingPage.chatAria")}
+            aria-label="會話練習對話"
           >
             <div
               ref={threadInnerRef}
@@ -237,7 +233,7 @@ export default function SpeakingPracticePage() {
             >
               {messages.length === 0 ? (
                 <p className="speaking-page__empty">
-                  {t("speakingPage.emptyThread")}
+                  送出訊息即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器，並讓上方模型欄位與可用 Gemini 模型一致（預設為 gemini-2.5-flash-lite）。
                 </p>
               ) : null}
               {messages.map((m) => {
@@ -258,8 +254,8 @@ export default function SpeakingPracticePage() {
                       <header className="bubble__meta">
                         <span className="bubble__name">
                           {isUser
-                            ? t("speakingPage.you")
-                            : t("speakingPage.assistant")}
+                            ? "你"
+                            : "助手"}
                         </span>
                       </header>
                       <div
@@ -290,7 +286,7 @@ export default function SpeakingPracticePage() {
           <form className="speaking-page__composer" onSubmit={onSubmit}>
             <label className="speaking-page__model-label">
               <span className="speaking-page__model-label-text">
-                {t("speakingPage.modelLabel")}
+                模型
               </span>
               <output
                 className="speaking-page__model-input"
@@ -301,7 +297,7 @@ export default function SpeakingPracticePage() {
             </label>
 
             <label className="sr-only" htmlFor="speaking-input">
-              {t("speakingPage.inputLabel")}
+              訊息
             </label>
             <textarea
               id="speaking-input"
@@ -309,7 +305,7 @@ export default function SpeakingPracticePage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onComposerKeyDown}
-              placeholder={t("speakingPage.inputPlaceholder")}
+              placeholder="輸入訊息…"
               disabled={isStreaming}
               rows={3}
             />
@@ -317,7 +313,7 @@ export default function SpeakingPracticePage() {
             <div className="speaking-page__actions">
               {isStreaming ? (
                 <span className="speaking-page__streaming" aria-live="polite">
-                  {t("speakingPage.streaming")}
+                  回覆中…
                 </span>
               ) : null}
               {isStreaming ? (
@@ -326,7 +322,7 @@ export default function SpeakingPracticePage() {
                   className="quick-test__btn news-card__btn--stop"
                   onClick={cancelStream}
                 >
-                  {t("speakingPage.stop")}
+                  停止
                 </button>
               ) : null}
               <button
@@ -334,7 +330,7 @@ export default function SpeakingPracticePage() {
                 className="quick-test__btn"
                 disabled={isStreaming || !input.trim()}
               >
-                {t("speakingPage.send")}
+                送出
               </button>
             </div>
           </form>

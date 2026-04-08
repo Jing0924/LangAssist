@@ -1,5 +1,3 @@
-import type { TFunction } from 'i18next'
-
 export const LANGUAGE_CODES = [
   'auto',
   'zh-TW',
@@ -23,11 +21,22 @@ export const PAIR_LANGUAGES = LANGUAGE_CODES.filter(
   (c) => c !== 'auto',
 ).map((code) => ({ code }))
 
-export function languageLabel(code: string, t: TFunction): string {
+const LANGUAGE_LABELS: Record<string, string> = {
+  auto: '自動偵測',
+  'zh-TW': '繁體中文',
+  'zh-CN': '简体中文',
+  en: 'English',
+  ja: '日本語',
+  ko: '한국어',
+  es: 'Español',
+  fr: 'Français',
+}
+
+export function languageLabel(code: string): string {
   if (!(LANGUAGE_CODES as readonly string[]).includes(code)) {
-    return t('languages.unknown')
+    return '—'
   }
-  return t(`languages.codes.${code}`)
+  return LANGUAGE_LABELS[code] ?? '—'
 }
 
 function isChineseAppCode(code: string): boolean {
