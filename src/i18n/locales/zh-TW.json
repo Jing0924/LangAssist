@@ -137,7 +137,7 @@
   },
   "speakingPage": {
     "title": "會話練習",
-    "subtitle": "透過 Netlify Function 串接 Gemini 進行文字對話。",
+    "subtitle": "在前端直接串接 Gemini 進行文字對話。",
     "chatAria": "會話練習對話",
     "you": "你",
     "assistant": "助手",
@@ -155,8 +155,8 @@
     "sessionsStoredHint": "對話僅存於此瀏覽器（最多 30 則）。",
     "streaming": "回覆中…",
     "systemPrompt": "你是口說／會話練習的語伴與助教。請以英文與學習者進行自然、簡短的對話。若表達有誤，先正常接話，再附上一兩點簡短、溫和的改正（必要時）。適時追問以延續話題。請專注於語言練習；若與學習無關、有安全疑慮或超出助教範圍的請求，請婉拒。\n\n當學習者明確要程式或技術範例時，所有程式碼請放在 Markdown 圍欄程式區塊內，開頭一行須標註語言（例如 tsx、ts、bash）。範例盡量短；必要時拆成多個區塊。其餘說明用簡短條列，避免過多層級標題。若對方沒有要程式，以口說練習為主，避免大段程式。",
-    "emptyThread": "送出訊息即可開始。請先設定 `GEMINI_API_KEY`、執行 `netlify dev`，並讓上方模型欄位與可用 Gemini 模型一致（預設為 gemini-2.5-flash-lite）。",
-    "errorNetwork": "無法連線到會話 API。若只跑 Vite，請改為 `netlify dev`，函式才能呼叫 Gemini。",
+    "emptyThread": "送出訊息即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器，並讓上方模型欄位與可用 Gemini 模型一致（預設為 gemini-2.5-flash-lite）。",
+    "errorNetwork": "瀏覽器無法連線 Gemini。請檢查 `VITE_GEMINI_API_KEY`、網路與模型權限。",
     "errorTimeout": "串流已停止或逾時。",
     "errorUpstream": "{{message}}",
     "errorUnknown": "發生未預期錯誤。"
