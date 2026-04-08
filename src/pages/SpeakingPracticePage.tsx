@@ -1,6 +1,8 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { AssistantMarkdown } from "../features/speaking/AssistantMarkdown";
+import { DEFAULT_LIVE_ORAL_MODEL } from "../features/speaking/speakingDefaults";
+import { useGeminiLiveSpeaking } from "../features/speaking/useGeminiLiveSpeaking";
 import { useSpeakingChat } from "../features/speaking/useSpeakingChat";
 import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSessionStore";
 
@@ -30,6 +32,19 @@ export default function SpeakingPracticePage() {
     messages,
     setMessages,
     model,
+    sessionKey: activeId,
+  });
+
+  const {
+    liveState,
+    liveError,
+    isLiveActive,
+    startLive,
+    stopLive,
+  } = useGeminiLiveSpeaking({
+    messages,
+    setMessages,
+    liveModelId: DEFAULT_LIVE_ORAL_MODEL,
     sessionKey: activeId,
   });
 
@@ -66,7 +81,7 @@ export default function SpeakingPracticePage() {
     if (stickToBottomRef.current) {
       scrollToBottom();
     }
-  }, [messages, isStreaming, activeId]);
+  }, [messages, isStreaming, isLiveActive, activeId]);
 
   const dateFmt = useMemo(
     () =>
@@ -82,6 +97,27 @@ export default function SpeakingPracticePage() {
     void sendMessage();
   };
 
+  const oralStatusLabel =
+    liveState === "idle"
+      ? "未連線"
+      : liveState === "connecting"
+        ? "連線中"
+        : "聆聽中";
+
+  const startOral = async () => {
+    cancelStream();
+    await startLive();
+  };
+
+  const stopOral = async () => {
+    await stopLive();
+  };
+
+  const clearConversationAll = async () => {
+    await stopLive();
+    clearConversation();
+  };
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     sendAfterScrollFlag();
@@ -90,13 +126,16 @@ export default function SpeakingPracticePage() {
   const onComposerKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
     e.preventDefault();
-    if (isStreaming || !input.trim()) return;
+    if (isStreaming || isLiveActive || !input.trim()) return;
     sendAfterScrollFlag();
   };
 
   const lastId = messages[messages.length - 1]?.id;
   const clearDisabled =
-    messages.length === 0 && !isStreaming && !input.trim();
+    messages.length === 0 &&
+    !isStreaming &&
+    !isLiveActive &&
+    !input.trim();
   const newChatDisabled = messages.length === 0;
 
   const onNewChat = () => {
@@ -120,13 +159,17 @@ export default function SpeakingPracticePage() {
       <header className="glass-panel glass-panel--header speaking-page__toolbar">
         <div className="speaking-page__intro">
           <h2 className="speaking-page__title">會話練習</h2>
-          <p className="speaking-page__subtitle">在前端直接串接 Gemini 進行文字對話。</p>
+          <p className="speaking-page__subtitle">
+            在前端直接串接 Gemini 進行文字對話，並可以 Live 口說練習（與文字使用不同模型）。
+          </p>
         </div>
         <button
           type="button"
           className="speaking-page__btn-clear"
-          onClick={clearConversation}
-          disabled={clearDisabled}
+          onClick={() => {
+            void clearConversationAll();
+          }}
+          disabled={clearDisabled && !isLiveActive}
         >
           清空對話
         </button>
@@ -233,13 +276,14 @@ export default function SpeakingPracticePage() {
             >
               {messages.length === 0 ? (
                 <p className="speaking-page__empty">
-                  送出訊息即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器，並讓上方模型欄位與可用 Gemini 模型一致（預設為 gemini-2.5-flash-lite）。
+                  送出訊息或開啟口說練習即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器；文字預設為 gemini-2.5-flash-lite，口說使用 Live 模型（見下方右欄）。
                 </p>
               ) : null}
               {messages.map((m) => {
                 const isUser = m.role === "user";
                 const showCaret =
                   isStreaming &&
+                  !isLiveActive &&
                   !isUser &&
                   m.id === lastId &&
                   m.role === "assistant";
@@ -284,17 +328,73 @@ export default function SpeakingPracticePage() {
           </section>
 
           <form className="speaking-page__composer" onSubmit={onSubmit}>
-            <label className="speaking-page__model-label">
-              <span className="speaking-page__model-label-text">
-                模型
-              </span>
-              <output
-                className="speaking-page__model-input"
-                aria-live="polite"
-              >
-                {model}
-              </output>
-            </label>
+            <div className="speaking-page__models-row">
+              <label className="speaking-page__model-label">
+                <span className="speaking-page__model-label-text">
+                  文字模型
+                </span>
+                <output
+                  className="speaking-page__model-input"
+                  aria-live="polite"
+                >
+                  {model}
+                </output>
+              </label>
+              <label className="speaking-page__model-label">
+                <span className="speaking-page__model-label-text">
+                  口說（Live）
+                </span>
+                <output
+                  className="speaking-page__model-input"
+                  aria-live="polite"
+                >
+                  {DEFAULT_LIVE_ORAL_MODEL}
+                </output>
+              </label>
+            </div>
+
+            <div className="speaking-page__oral" aria-label="口說練習">
+              <div className="speaking-page__oral-head">
+                <span className="speaking-page__oral-title">口說練習</span>
+                <span
+                  className={`speaking-page__oral-status${liveState === "listening" ? " speaking-page__oral-status--live" : ""}`}
+                  aria-live="polite"
+                >
+                  {oralStatusLabel}
+                </span>
+              </div>
+              {liveError ? (
+                <p className="speaking-page__error" role="alert">
+                  {liveError}
+                </p>
+              ) : null}
+              <div className="speaking-page__oral-actions">
+                {liveState === "idle" || liveState === "connecting" ? (
+                  <button
+                    type="button"
+                    className="quick-test__btn"
+                    onClick={() => {
+                      void startOral();
+                    }}
+                    disabled={
+                      isStreaming || liveState === "connecting"
+                    }
+                  >
+                    {liveState === "connecting" ? "連線中…" : "開始口說"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="quick-test__btn news-card__btn--stop"
+                    onClick={() => {
+                      void stopOral();
+                    }}
+                  >
+                    停止口說
+                  </button>
+                )}
+              </div>
+            </div>
 
             <label className="sr-only" htmlFor="speaking-input">
               訊息
@@ -306,17 +406,17 @@ export default function SpeakingPracticePage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onComposerKeyDown}
               placeholder="輸入訊息…"
-              disabled={isStreaming}
+              disabled={isStreaming || isLiveActive}
               rows={3}
             />
 
             <div className="speaking-page__actions">
-              {isStreaming ? (
+              {isStreaming && !isLiveActive ? (
                 <span className="speaking-page__streaming" aria-live="polite">
                   回覆中…
                 </span>
               ) : null}
-              {isStreaming ? (
+              {isStreaming && !isLiveActive ? (
                 <button
                   type="button"
                   className="quick-test__btn news-card__btn--stop"
@@ -325,10 +425,15 @@ export default function SpeakingPracticePage() {
                   停止
                 </button>
               ) : null}
+              {isLiveActive ? (
+                <span className="speaking-page__streaming" aria-live="polite">
+                  口說模式中，請停止口說後再打字送出。
+                </span>
+              ) : null}
               <button
                 type="submit"
                 className="quick-test__btn"
-                disabled={isStreaming || !input.trim()}
+                disabled={isStreaming || isLiveActive || !input.trim()}
               >
                 送出
               </button>
