@@ -1,8 +1,13 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { AssistantMarkdown } from "../features/speaking/AssistantMarkdown";
-import { DEFAULT_LIVE_ORAL_MODEL } from "../features/speaking/speakingDefaults";
+import {
+  isGeminiLiveOralMode,
+  isPipelineOralMode,
+  ORAL_MODE_OPTIONS,
+} from "../features/speaking/speakingDefaults";
 import { useGeminiLiveSpeaking } from "../features/speaking/useGeminiLiveSpeaking";
+import { usePipelineOralSpeaking } from "../features/speaking/usePipelineOralSpeaking";
 import { useSpeakingChat } from "../features/speaking/useSpeakingChat";
 import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSessionStore";
 
@@ -15,6 +20,8 @@ export default function SpeakingPracticePage() {
     messages,
     setMessages,
     model,
+    liveModel,
+    setLiveModel,
     switchSession,
     createSession,
     deleteSession,
@@ -44,9 +51,27 @@ export default function SpeakingPracticePage() {
   } = useGeminiLiveSpeaking({
     messages,
     setMessages,
-    liveModelId: DEFAULT_LIVE_ORAL_MODEL,
+    liveModelId: liveModel,
     sessionKey: activeId,
+    disabled: !isGeminiLiveOralMode(liveModel),
   });
+
+  const {
+    pipelineState,
+    pipelineError,
+    isPipelineBusy,
+    isPipelineReplying,
+    startPipelineRecording,
+    stopPipelineAndSend,
+    cancelPipelineOral,
+  } = usePipelineOralSpeaking({
+    messages,
+    setMessages,
+    sessionKey: activeId,
+    disabled: !isPipelineOralMode(liveModel),
+  });
+
+  const pipelineMode = isPipelineOralMode(liveModel);
 
   const threadInnerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
@@ -81,7 +106,7 @@ export default function SpeakingPracticePage() {
     if (stickToBottomRef.current) {
       scrollToBottom();
     }
-  }, [messages, isStreaming, isLiveActive, activeId]);
+  }, [messages, isStreaming, isLiveActive, isPipelineReplying, activeId]);
 
   const dateFmt = useMemo(
     () =>
@@ -97,24 +122,51 @@ export default function SpeakingPracticePage() {
     void sendMessage();
   };
 
-  const oralStatusLabel =
+  const oralStatusLive =
     liveState === "idle"
       ? "未連線"
       : liveState === "connecting"
         ? "連線中"
         : "聆聽中";
 
-  const startOral = async () => {
+  const oralStatusPipeline =
+    pipelineState === "idle"
+      ? "待機"
+      : pipelineState === "recording"
+        ? "錄音中"
+        : pipelineState === "transcribing"
+          ? "轉錄中"
+          : pipelineState === "replying"
+            ? "生成回覆中"
+            : pipelineState === "speaking"
+              ? "朗讀中"
+              : "錯誤";
+
+  const oralStatusLabel = pipelineMode ? oralStatusPipeline : oralStatusLive;
+
+  const oralStatusActive =
+    pipelineMode &&
+    (pipelineState === "recording" ||
+      pipelineState === "replying" ||
+      pipelineState === "speaking");
+
+  const startLiveOral = async () => {
     cancelStream();
     await startLive();
   };
 
-  const stopOral = async () => {
+  const stopLiveOral = async () => {
     await stopLive();
+  };
+
+  const startPipelineOral = async () => {
+    cancelStream();
+    await startPipelineRecording();
   };
 
   const clearConversationAll = async () => {
     await stopLive();
+    await cancelPipelineOral();
     clearConversation();
   };
 
@@ -126,7 +178,7 @@ export default function SpeakingPracticePage() {
   const onComposerKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
     e.preventDefault();
-    if (isStreaming || isLiveActive || !input.trim()) return;
+    if (isStreaming || isLiveActive || isPipelineBusy || !input.trim()) return;
     sendAfterScrollFlag();
   };
 
@@ -135,6 +187,7 @@ export default function SpeakingPracticePage() {
     messages.length === 0 &&
     !isStreaming &&
     !isLiveActive &&
+    !isPipelineBusy &&
     !input.trim();
   const newChatDisabled = messages.length === 0;
 
@@ -160,7 +213,8 @@ export default function SpeakingPracticePage() {
         <div className="speaking-page__intro">
           <h2 className="speaking-page__title">會話練習</h2>
           <p className="speaking-page__subtitle">
-            在前端直接串接 Gemini 進行文字對話，並可以 Live 口說練習（與文字使用不同模型）。
+            在前端直接串接 Gemini 進行文字對話，並可選 Gemini Live 或 Flash
+            Lite 錄音管道口說（後者需 Cloud STT／TTS）。
           </p>
         </div>
         <button
@@ -169,7 +223,7 @@ export default function SpeakingPracticePage() {
           onClick={() => {
             void clearConversationAll();
           }}
-          disabled={clearDisabled && !isLiveActive}
+          disabled={clearDisabled && !isLiveActive && !isPipelineBusy}
         >
           清空對話
         </button>
@@ -276,14 +330,18 @@ export default function SpeakingPracticePage() {
             >
               {messages.length === 0 ? (
                 <p className="speaking-page__empty">
-                  送出訊息或開啟口說練習即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器；文字預設為 gemini-2.5-flash-lite，口說使用 Live 模型（見下方右欄）。
+                  送出訊息或開啟口說練習即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器；口說可選 Gemini
+                  Live（即時音訊）或 Flash Lite
+                  管道（需另設 `VITE_GOOGLE_CLOUD_API_KEY` 啟用 STT／TTS），詳見下方說明。
                 </p>
               ) : null}
               {messages.map((m) => {
                 const isUser = m.role === "user";
+                const assistantStreaming =
+                  (isStreaming && !isLiveActive) ||
+                  (pipelineMode && isPipelineReplying);
                 const showCaret =
-                  isStreaming &&
-                  !isLiveActive &&
+                  assistantStreaming &&
                   !isUser &&
                   m.id === lastId &&
                   m.role === "assistant";
@@ -342,39 +400,125 @@ export default function SpeakingPracticePage() {
               </label>
               <label className="speaking-page__model-label">
                 <span className="speaking-page__model-label-text">
-                  口說（Live）
+                  口說模式
                 </span>
-                <output
-                  className="speaking-page__model-input"
-                  aria-live="polite"
+                <select
+                  className="speaking-page__model-input speaking-page__model-input--live-select"
+                  value={liveModel}
+                  onChange={(e) => setLiveModel(e.target.value)}
+                  disabled={
+                    isLiveActive ||
+                    liveState === "connecting" ||
+                    isPipelineBusy
+                  }
+                  aria-label="口說模式（Live 或語音管道）"
                 >
-                  {DEFAULT_LIVE_ORAL_MODEL}
-                </output>
+                  {ORAL_MODE_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
+            <p className="speaking-page__live-model-hint">
+              <strong>Gemini Live</strong>
+              ：瀏覽器即時麥克風／音訊，只需 `VITE_GEMINI_API_KEY`。
+              <strong> Flash Lite 管道</strong>
+              ：錄音後經 Google Cloud Speech-to-Text → Gemini 2.5 Flash
+              Lite 串流 → Text-to-Speech 英文朗讀；需同一組
+              `VITE_GOOGLE_CLOUD_API_KEY` 並在 GCP 啟用 STT 與 TTS。文字對話仍用上方文字模型；管道口說的 LLM 固定為
+              flash-lite。
+            </p>
 
             <div className="speaking-page__oral" aria-label="口說練習">
               <div className="speaking-page__oral-head">
                 <span className="speaking-page__oral-title">口說練習</span>
                 <span
-                  className={`speaking-page__oral-status${liveState === "listening" ? " speaking-page__oral-status--live" : ""}`}
+                  className={`speaking-page__oral-status${liveState === "listening" || oralStatusActive ? " speaking-page__oral-status--live" : ""}`}
                   aria-live="polite"
                 >
                   {oralStatusLabel}
                 </span>
               </div>
-              {liveError ? (
-                <p className="speaking-page__error" role="alert">
-                  {liveError}
-                </p>
+              {pipelineMode && pipelineError ? (
+                <div className="speaking-page__live-error" role="alert">
+                  <p className="speaking-page__error">{pipelineError}</p>
+                  <p className="speaking-page__error-hint">
+                    前綴 STT／Gemini／TTS 表示故障環節；請確認
+                    `VITE_GOOGLE_CLOUD_API_KEY` 權限（Speech-to-Text、Text-to-Speech）或
+                    `VITE_GEMINI_API_KEY`。
+                  </p>
+                </div>
+              ) : null}
+              {!pipelineMode && liveError ? (
+                <div className="speaking-page__live-error" role="alert">
+                  <p className="speaking-page__error">{liveError}</p>
+                  <p className="speaking-page__error-hint">
+                    若訊息含 code／status，請複製全文並對照 Google AI Studio Live
+                    或專案 API 權限與配額。
+                  </p>
+                </div>
               ) : null}
               <div className="speaking-page__oral-actions">
-                {liveState === "idle" || liveState === "connecting" ? (
+                {pipelineMode ? (
+                  <>
+                    {pipelineState === "idle" || pipelineState === "error" ? (
+                      <button
+                        type="button"
+                        className="quick-test__btn"
+                        onClick={() => {
+                          void startPipelineOral();
+                        }}
+                        disabled={isStreaming || isPipelineBusy}
+                      >
+                        開始錄音
+                      </button>
+                    ) : null}
+                    {pipelineState === "recording" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="quick-test__btn news-card__btn--stop"
+                          onClick={() => {
+                            void stopPipelineAndSend();
+                          }}
+                          disabled={isStreaming}
+                        >
+                          停止並送出
+                        </button>
+                        <button
+                          type="button"
+                          className="quick-test__btn"
+                          onClick={() => {
+                            void cancelPipelineOral();
+                          }}
+                          disabled={isStreaming}
+                        >
+                          取消錄音
+                        </button>
+                      </>
+                    ) : null}
+                    {pipelineState === "transcribing" ||
+                    pipelineState === "replying" ||
+                    pipelineState === "speaking" ? (
+                      <button
+                        type="button"
+                        className="quick-test__btn news-card__btn--stop"
+                        onClick={() => {
+                          void cancelPipelineOral();
+                        }}
+                      >
+                        取消
+                      </button>
+                    ) : null}
+                  </>
+                ) : liveState === "idle" || liveState === "connecting" ? (
                   <button
                     type="button"
                     className="quick-test__btn"
                     onClick={() => {
-                      void startOral();
+                      void startLiveOral();
                     }}
                     disabled={
                       isStreaming || liveState === "connecting"
@@ -387,7 +531,7 @@ export default function SpeakingPracticePage() {
                     type="button"
                     className="quick-test__btn news-card__btn--stop"
                     onClick={() => {
-                      void stopOral();
+                      void stopLiveOral();
                     }}
                   >
                     停止口說
@@ -406,7 +550,7 @@ export default function SpeakingPracticePage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onComposerKeyDown}
               placeholder="輸入訊息…"
-              disabled={isStreaming || isLiveActive}
+              disabled={isStreaming || isLiveActive || isPipelineBusy}
               rows={3}
             />
 
@@ -427,13 +571,20 @@ export default function SpeakingPracticePage() {
               ) : null}
               {isLiveActive ? (
                 <span className="speaking-page__streaming" aria-live="polite">
-                  口說模式中，請停止口說後再打字送出。
+                  Live 口說中，請停止口說後再打字送出。
+                </span>
+              ) : null}
+              {pipelineMode && isPipelineBusy ? (
+                <span className="speaking-page__streaming" aria-live="polite">
+                  語音管道處理中，請稍候或按「取消」；完成前無法打字送出。
                 </span>
               ) : null}
               <button
                 type="submit"
                 className="quick-test__btn"
-                disabled={isStreaming || isLiveActive || !input.trim()}
+                disabled={
+                  isStreaming || isLiveActive || isPipelineBusy || !input.trim()
+                }
               >
                 送出
               </button>

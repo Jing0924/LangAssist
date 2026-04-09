@@ -1,3 +1,7 @@
+import {
+  DEFAULT_ORAL_MODE_ID,
+  normalizeStoredLiveModelId,
+} from "./speakingDefaults";
 import type { ChatMessage, SpeakingSession } from "./types";
 
 export const SPEAKING_SESSIONS_STORAGE_KEY = "langassist:speaking-sessions:v1";
@@ -24,11 +28,15 @@ export function titleFromFirstUserMessage(messages: ChatMessage[]): string | nul
   return truncateTitle(first.content, 36);
 }
 
-export function createEmptySession(model: string): SpeakingSession {
+export function createEmptySession(
+  model: string,
+  liveModel: string = DEFAULT_ORAL_MODE_ID,
+): SpeakingSession {
   return {
     id: crypto.randomUUID(),
     title: null,
     model,
+    liveModel,
     messages: [],
     updatedAt: Date.now(),
   };
@@ -77,6 +85,7 @@ export function loadSpeakingSessions(): SpeakingSessionsStoredV1 | null {
           id: r.id,
           title,
           model: r.model,
+          liveModel: normalizeStoredLiveModelId(r.liveModel),
           messages: r.messages as ChatMessage[],
           updatedAt: r.updatedAt,
         };

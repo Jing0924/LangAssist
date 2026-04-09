@@ -3,6 +3,9 @@ import type { ChatMessage } from "./types";
 export const GEMINI_LIVE_WS_PATH =
   "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
+/** Reject connect if no setupComplete (e.g. model without Live API) or network stalls. */
+const GEMINI_LIVE_SETUP_TIMEOUT_MS = 35_000;
+
 export function geminiLiveWebSocketUrl(apiKey: string): string {
   return `${GEMINI_LIVE_WS_PATH}?key=${encodeURIComponent(apiKey)}`;
 }
@@ -49,37 +52,50 @@ function buildSetupMessage(params: {
   seedHistory: boolean;
 }) {
   const modelUri = `models/${normalizeLiveModelId(params.modelId)}`;
+  /** Minimal setup (closest to official getting-started) to avoid INVALID_ARGUMENT from optional fields. */
   return {
     setup: {
       model: modelUri,
       generationConfig: {
         responseModalities: ["AUDIO"],
         temperature: params.temperature,
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Puck" },
-          },
-        },
       },
       systemInstruction: { parts: [{ text: params.systemInstruction }] },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
-      realtimeInputConfig: {
-        automaticActivityDetection: {
-          disabled: false,
-          silenceDurationMs: 2000,
-          prefixPaddingMs: 500,
-          endOfSpeechSensitivity: "END_SENSITIVITY_UNSPECIFIED",
-          startOfSpeechSensitivity: "START_SENSITIVITY_UNSPECIFIED",
-        },
-        activityHandling: "ACTIVITY_HANDLING_UNSPECIFIED",
-        turnCoverage: "TURN_INCLUDES_ONLY_ACTIVITY",
-      },
       ...(params.seedHistory
         ? { historyConfig: { initialHistoryInClientContent: true } }
         : {}),
     },
   };
+}
+
+function formatGeminiLiveServerError(err: unknown, depth = 0): string {
+  if (depth > 3 || err === null || err === undefined) return "";
+  if (typeof err === "string") return err.trim();
+  if (typeof err !== "object") return String(err);
+
+  const o = err as Record<string, unknown>;
+  const segments: string[] = [];
+
+  const msg = o.message;
+  if (typeof msg === "string" && msg.trim()) segments.push(msg.trim());
+
+  const code = o.code;
+  if (typeof code === "number" || typeof code === "string") {
+    segments.push(`code=${code}`);
+  }
+
+  const status = o.status;
+  if (typeof status === "string" && status.trim()) {
+    segments.push(`status=${status.trim()}`);
+  }
+
+  const nested = o.error;
+  if (nested !== undefined && nested !== err) {
+    const inner = formatGeminiLiveServerError(nested, depth + 1);
+    if (inner) segments.push(`(${inner})`);
+  }
+
+  return segments.filter(Boolean).join(" · ");
 }
 
 export type GeminiLiveSession = {
@@ -120,9 +136,21 @@ export function connectGeminiLiveSession(options: {
     }
 
     let settled = false;
+    let preSetupSocketFailureReported = false;
     let ws: WebSocket | null = new WebSocket(geminiLiveWebSocketUrl(key));
+    let setupTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let devInboundLogged = 0;
+    const DEV_INBOUND_LOG_MAX = 8;
+
+    const clearSetupTimeout = () => {
+      if (setupTimeoutId !== null) {
+        clearTimeout(setupTimeoutId);
+        setupTimeoutId = null;
+      }
+    };
 
     const onAbort = () => {
+      clearSetupTimeout();
       try {
         ws?.close();
       } catch {
@@ -141,6 +169,7 @@ export function connectGeminiLiveSession(options: {
     options.signal?.addEventListener("abort", onAbort, { once: true });
 
     const fail = (msg: string) => {
+      clearSetupTimeout();
       try {
         ws?.close();
       } catch {
@@ -155,8 +184,21 @@ export function connectGeminiLiveSession(options: {
       options.callbacks.onError(msg);
     };
 
+    const failPreSetupSocket = (msg: string) => {
+      if (settled || preSetupSocketFailureReported) return;
+      preSetupSocketFailureReported = true;
+      fail(msg);
+    };
+
+    setupTimeoutId = setTimeout(() => {
+      fail(
+        "連線逾時或未收到伺服器完成設定，請確認模型支援 Live API。",
+      );
+    }, GEMINI_LIVE_SETUP_TIMEOUT_MS);
+
     const finishConnect = () => {
       if (settled) return;
+      clearSetupTimeout();
       options.signal?.removeEventListener("abort", onAbort);
       settled = true;
       resolve({
@@ -185,10 +227,19 @@ export function connectGeminiLiveSession(options: {
     };
 
     ws.onerror = () => {
-      fail("WebSocket connection error.");
+      failPreSetupSocket("WebSocket connection error.");
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      if (!settled && !preSetupSocketFailureReported) {
+        const detail =
+          ev.code === 1000 && ev.reason === "" && ev.wasClean
+            ? "WebSocket closed cleanly before setup completed."
+            : `WebSocket closed before setup: code=${ev.code}${
+                ev.reason ? ` reason=${ev.reason}` : ""
+              }`;
+        failPreSetupSocket(detail);
+      }
       options.callbacks.onClose();
       ws = null;
     };
@@ -224,10 +275,17 @@ export function connectGeminiLiveSession(options: {
           return;
         }
 
-        const err = data.error as { message?: string } | undefined;
-        if (err && typeof err.message === "string" && err.message.trim()) {
-          fail(err.message.trim());
-          return;
+        if (import.meta.env.DEV && devInboundLogged < DEV_INBOUND_LOG_MAX) {
+          devInboundLogged += 1;
+          console.debug("[Gemini Live] inbound", data);
+        }
+
+        if (data.error !== undefined) {
+          const formatted = formatGeminiLiveServerError(data.error);
+          if (formatted) {
+            fail(formatted);
+            return;
+          }
         }
 
         if (data.setupComplete) {

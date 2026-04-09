@@ -1,6 +1,6 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DEFAULT_SPEAKING_MODEL } from "./speakingDefaults";
+import { DEFAULT_SPEAKING_MODEL, normalizeStoredLiveModelId } from "./speakingDefaults";
 import {
   createEmptySession,
   loadSpeakingSessions,
@@ -85,6 +85,23 @@ export function useSpeakingSessionStore() {
     });
   }, []);
 
+  const setLiveModel = useCallback((value: string) => {
+    const nextId = normalizeStoredLiveModelId(value);
+    setState((prev) => {
+      const idx = prev.sessions.findIndex((s) => s.id === prev.activeId);
+      if (idx === -1) return prev;
+      const s = prev.sessions[idx];
+      const updated: SpeakingSession = {
+        ...s,
+        liveModel: nextId,
+        updatedAt: Date.now(),
+      };
+      const sessions = [...prev.sessions];
+      sessions[idx] = updated;
+      return { ...prev, sessions };
+    });
+  }, []);
+
   const sortedSessions = useMemo(
     () => [...state.sessions].sort((a, b) => b.updatedAt - a.updatedAt),
     [state.sessions],
@@ -102,7 +119,8 @@ export function useSpeakingSessionStore() {
       const current = prev.sessions.find((s) => s.id === prev.activeId);
       if (current && current.messages.length === 0) return prev;
       const model = current?.model?.trim() || DEFAULT_SPEAKING_MODEL;
-      const next = createEmptySession(model);
+      const liveModel = normalizeStoredLiveModelId(current?.liveModel);
+      const next = createEmptySession(model, liveModel);
       let combined = [next, ...prev.sessions];
       if (combined.length > MAX_SPEAKING_SESSIONS) {
         combined = combined
@@ -135,6 +153,8 @@ export function useSpeakingSessionStore() {
     setMessages,
     model: activeSession?.model ?? DEFAULT_SPEAKING_MODEL,
     setModel,
+    liveModel: normalizeStoredLiveModelId(activeSession?.liveModel),
+    setLiveModel,
     switchSession,
     createSession,
     deleteSession,

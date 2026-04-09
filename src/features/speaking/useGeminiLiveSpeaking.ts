@@ -13,6 +13,8 @@ export type UseGeminiLiveSpeakingOptions = {
   liveModelId: string;
   /** When this changes, Live is torn down (e.g. active session id). */
   sessionKey: string;
+  /** When true, never connects; startLive is a no-op and active sessions are torn down. */
+  disabled?: boolean;
 };
 
 const ORAL_PLACEHOLDER_USER = "（語音）";
@@ -23,6 +25,7 @@ export function useGeminiLiveSpeaking({
   setMessages,
   liveModelId,
   sessionKey,
+  disabled = false,
 }: UseGeminiLiveSpeakingOptions) {
   const [liveState, setLiveState] = useState<LiveOralState>("idle");
   const [liveError, setLiveError] = useState<string | null>(null);
@@ -100,7 +103,13 @@ export function useGeminiLiveSpeaking({
     void tearDown();
   }, [sessionKey, tearDown]);
 
+  useEffect(() => {
+    if (!disabled) return;
+    void tearDown();
+  }, [disabled, tearDown]);
+
   const startLive = useCallback(async () => {
+    if (disabled) return;
     setLiveError(null);
     setLiveState("connecting");
     await cleanupResources();
@@ -184,7 +193,14 @@ export function useGeminiLiveSpeaking({
       await cleanupResources();
       setLiveState("idle");
     }
-  }, [cleanupResources, flushTurnToMessages, liveModelId, messages, tearDown]);
+  }, [
+    cleanupResources,
+    disabled,
+    flushTurnToMessages,
+    liveModelId,
+    messages,
+    tearDown,
+  ]);
 
   const stopLive = useCallback(async () => {
     setLiveError(null);

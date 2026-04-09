@@ -34,6 +34,8 @@ export interface SpeakingSession {
   id: string;
   title: string | null;
   model: string;
+  /** Oral mode id: Gemini Live / native-audio model, or pipeline sentinel (e.g. STT → LLM → TTS). */
+  liveModel: string;
   messages: ChatMessage[];
   updatedAt: number;
 }
