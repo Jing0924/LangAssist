@@ -1,15 +1,19 @@
 :root {
   --font-sans: 'Outfit', system-ui, 'Segoe UI', sans-serif;
-  --text-primary: rgba(248, 250, 252, 0.96);
-  --text-secondary: rgba(226, 232, 240, 0.72);
-  --text-muted: rgba(148, 163, 184, 0.85);
-  --accent: #22d3ee;
-  --accent-soft: rgba(34, 211, 238, 0.22);
-  --accent-glow: rgba(34, 211, 238, 0.35);
-  --danger: #fb7185;
-  --glass-bg: rgba(15, 23, 42, 0.45);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --text-primary: oklch(0.98 0.012 260 / 0.96);
+  --text-secondary: oklch(0.9 0.022 260 / 0.74);
+  --text-muted: oklch(0.72 0.04 260 / 0.88);
+  --accent: oklch(0.82 0.14 200);
+  --accent-soft: oklch(0.82 0.14 200 / 0.24);
+  --accent-glow: oklch(0.82 0.14 200 / 0.38);
+  --accent-2: oklch(0.72 0.22 290);
+  --danger: oklch(0.72 0.19 15);
+  --glass-bg: oklch(1 0 0 / 0.1);
+  --glass-border: oklch(1 0 0 / 0.14);
+  --glass-highlight: oklch(1 0 0 / 0.08);
+  --surface-deep: oklch(0.2 0.06 275);
+  --surface-mid: oklch(0.24 0.09 285);
+  --surface-ink: oklch(0.18 0.05 265);
   color-scheme: dark;
 }
 
@@ -43,7 +47,12 @@ body {
   gap: 1rem;
   padding: 2rem;
   text-align: center;
-  background: linear-gradient(145deg, #0c1222 0%, #1a1040 42%, #0d2137 100%);
+  background: linear-gradient(
+    145deg,
+    var(--surface-ink) 0%,
+    var(--surface-mid) 42%,
+    oklch(0.2 0.08 250) 100%
+  );
 }
 
 .error-boundary__title {

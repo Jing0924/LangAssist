@@ -1,5 +1,7 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import { useLayoutEffect, useMemo, useRef } from "react";
+import { GlassBentoCard } from "../components/GlassBentoCard";
+import { MotionPressable } from "../components/MotionPressable";
 import { AssistantMarkdown } from "../features/speaking/AssistantMarkdown";
 import {
   isGeminiLiveOralMode,
@@ -209,7 +211,7 @@ export default function SpeakingPracticePage() {
 
   return (
     <div className="speaking-page">
-      <header className="glass-panel glass-panel--header speaking-page__toolbar">
+      <GlassBentoCard className="glass-panel--header speaking-page__toolbar">
         <div className="speaking-page__intro">
           <h2 className="speaking-page__title">會話練習</h2>
           <p className="speaking-page__subtitle">
@@ -217,7 +219,7 @@ export default function SpeakingPracticePage() {
             Lite 錄音管道口說（後者需 Cloud STT／TTS）。
           </p>
         </div>
-        <button
+        <MotionPressable
           type="button"
           className="speaking-page__btn-clear"
           onClick={() => {
@@ -226,14 +228,12 @@ export default function SpeakingPracticePage() {
           disabled={clearDisabled && !isLiveActive && !isPipelineBusy}
         >
           清空對話
-        </button>
-      </header>
+        </MotionPressable>
+      </GlassBentoCard>
 
-      <div className="speaking-page__layout">
-        <aside
-          className="glass-panel speaking-page__sidebar"
-          aria-label="對話歷史"
-        >
+      <div className="speaking-bento">
+        <aside className="speaking-bento__aside" aria-label="對話歷史">
+          <GlassBentoCard className="speaking-page__sidebar speaking-bento__sidebar-card">
           <div className="speaking-page__sidebar-head">
             <h3 className="speaking-page__sidebar-title">
               對話歷史
@@ -243,7 +243,7 @@ export default function SpeakingPracticePage() {
                 請先在此對話送出至少一則訊息，才能建立新對話。
               </span>
             ) : null}
-            <button
+            <MotionPressable
               type="button"
               className="speaking-page__btn-new"
               onClick={onNewChat}
@@ -258,7 +258,7 @@ export default function SpeakingPracticePage() {
               }
             >
               新對話
-            </button>
+            </MotionPressable>
           </div>
           <p className="speaking-page__sessions-hint">
             對話僅存於此瀏覽器（最多 30 則）。
@@ -272,7 +272,7 @@ export default function SpeakingPracticePage() {
                   <div
                     className={`speaking-page__session-item${isActive ? " speaking-page__session-item--active" : ""}`}
                   >
-                    <button
+                    <MotionPressable
                       type="button"
                       className="speaking-page__session-select"
                       onClick={() => onSelectSession(s.id)}
@@ -286,8 +286,8 @@ export default function SpeakingPracticePage() {
                       >
                         {dateFmt.format(s.updatedAt)}
                       </time>
-                    </button>
-                    <button
+                    </MotionPressable>
+                    <MotionPressable
                       type="button"
                       className="speaking-page__session-delete"
                       onClick={(e) => {
@@ -297,16 +297,17 @@ export default function SpeakingPracticePage() {
                       aria-label={`刪除對話：${label}`}
                     >
                       刪除
-                    </button>
+                    </MotionPressable>
                   </div>
                 </li>
               );
             })}
           </ul>
+          </GlassBentoCard>
         </aside>
 
-        <section
-          className="glass-panel speaking-page__panel"
+        <GlassBentoCard
+          className="speaking-page__panel"
           aria-labelledby="speaking-heading"
         >
           <h2 id="speaking-heading" className="sr-only">
@@ -464,7 +465,7 @@ export default function SpeakingPracticePage() {
                 {pipelineMode ? (
                   <>
                     {pipelineState === "idle" || pipelineState === "error" ? (
-                      <button
+                      <MotionPressable
                         type="button"
                         className="quick-test__btn"
                         onClick={() => {
@@ -473,11 +474,11 @@ export default function SpeakingPracticePage() {
                         disabled={isStreaming || isPipelineBusy}
                       >
                         開始錄音
-                      </button>
+                      </MotionPressable>
                     ) : null}
                     {pipelineState === "recording" ? (
                       <>
-                        <button
+                        <MotionPressable
                           type="button"
                           className="quick-test__btn news-card__btn--stop"
                           onClick={() => {
@@ -486,8 +487,8 @@ export default function SpeakingPracticePage() {
                           disabled={isStreaming}
                         >
                           停止並送出
-                        </button>
-                        <button
+                        </MotionPressable>
+                        <MotionPressable
                           type="button"
                           className="quick-test__btn"
                           onClick={() => {
@@ -496,13 +497,13 @@ export default function SpeakingPracticePage() {
                           disabled={isStreaming}
                         >
                           取消錄音
-                        </button>
+                        </MotionPressable>
                       </>
                     ) : null}
                     {pipelineState === "transcribing" ||
                     pipelineState === "replying" ||
                     pipelineState === "speaking" ? (
-                      <button
+                      <MotionPressable
                         type="button"
                         className="quick-test__btn news-card__btn--stop"
                         onClick={() => {
@@ -510,11 +511,11 @@ export default function SpeakingPracticePage() {
                         }}
                       >
                         取消
-                      </button>
+                      </MotionPressable>
                     ) : null}
                   </>
                 ) : liveState === "idle" || liveState === "connecting" ? (
-                  <button
+                  <MotionPressable
                     type="button"
                     className="quick-test__btn"
                     onClick={() => {
@@ -525,9 +526,9 @@ export default function SpeakingPracticePage() {
                     }
                   >
                     {liveState === "connecting" ? "連線中…" : "開始口說"}
-                  </button>
+                  </MotionPressable>
                 ) : (
-                  <button
+                  <MotionPressable
                     type="button"
                     className="quick-test__btn news-card__btn--stop"
                     onClick={() => {
@@ -535,7 +536,7 @@ export default function SpeakingPracticePage() {
                     }}
                   >
                     停止口說
-                  </button>
+                  </MotionPressable>
                 )}
               </div>
             </div>
@@ -561,13 +562,13 @@ export default function SpeakingPracticePage() {
                 </span>
               ) : null}
               {isStreaming && !isLiveActive ? (
-                <button
+                <MotionPressable
                   type="button"
                   className="quick-test__btn news-card__btn--stop"
                   onClick={cancelStream}
                 >
                   停止
-                </button>
+                </MotionPressable>
               ) : null}
               {isLiveActive ? (
                 <span className="speaking-page__streaming" aria-live="polite">
@@ -579,7 +580,7 @@ export default function SpeakingPracticePage() {
                   語音管道處理中，請稍候或按「取消」；完成前無法打字送出。
                 </span>
               ) : null}
-              <button
+              <MotionPressable
                 type="submit"
                 className="quick-test__btn"
                 disabled={
@@ -587,10 +588,10 @@ export default function SpeakingPracticePage() {
                 }
               >
                 送出
-              </button>
+              </MotionPressable>
             </div>
           </form>
-        </section>
+        </GlassBentoCard>
       </div>
     </div>
   );

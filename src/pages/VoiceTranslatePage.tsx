@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { GlassBentoCard } from '../components/GlassBentoCard'
+import { MotionPressable } from '../components/MotionPressable'
 import { isAbortError } from '../shared/lib/abortError'
 import {
   blobToBase64,
@@ -642,7 +644,15 @@ export default function VoiceTranslatePage() {
 
   return (
     <main className="voice-page" aria-label={t('voice.pageAria')}>
-        <header className="glass-panel glass-panel--header voice-page__toolbar">
+      <div
+        className={[
+          'bento-grid bento-grid--voice',
+          recording ? 'bento-grid--voice--recording' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <GlassBentoCard className="glass-panel--header voice-page__toolbar bento-voice__toolbar">
           <div className="voice-page__intro">
             <h2 className="voice-page__title">{t('voice.toolbar.title')}</h2>
             <p className="voice-page__hint">{t('voice.toolbar.subtitle')}</p>
@@ -679,15 +689,15 @@ export default function VoiceTranslatePage() {
               </span>
             ) : null}
           </div>
-        </header>
+        </GlassBentoCard>
 
-        <section className="lang-bar glass-panel" aria-label={t('voice.langBarAria')}>
+        <GlassBentoCard className="lang-bar bento-voice__lang" aria-label={t('voice.langBarAria')}>
           <div
             className="mode-switch"
             role="group"
             aria-label={t('voice.mode.groupAria')}
           >
-            <button
+            <MotionPressable
               type="button"
               className={[
                 'mode-switch__btn',
@@ -699,8 +709,8 @@ export default function VoiceTranslatePage() {
               disabled={recording || busy}
             >
               {t('voice.mode.oneWay')}
-            </button>
-            <button
+            </MotionPressable>
+            <MotionPressable
               type="button"
               className={[
                 'mode-switch__btn',
@@ -714,7 +724,7 @@ export default function VoiceTranslatePage() {
               disabled={recording || busy}
             >
               {t('voice.mode.bidirectional')}
-            </button>
+            </MotionPressable>
           </div>
 
           {translateMode === 'oneWay' ? (
@@ -736,7 +746,7 @@ export default function VoiceTranslatePage() {
                 ))}
               </select>
 
-              <button
+              <MotionPressable
                 type="button"
                 className="swap-btn"
                 onClick={swapLanguages}
@@ -757,7 +767,7 @@ export default function VoiceTranslatePage() {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </button>
+              </MotionPressable>
 
               <label className="sr-only" htmlFor={`${id}-target`}>
                 {t('voice.lang.target')}
@@ -796,7 +806,7 @@ export default function VoiceTranslatePage() {
                 ))}
               </select>
 
-              <button
+              <MotionPressable
                 type="button"
                 className="swap-btn"
                 onClick={swapLanguages}
@@ -813,7 +823,7 @@ export default function VoiceTranslatePage() {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </button>
+              </MotionPressable>
 
               <label className="sr-only" htmlFor={`${id}-pair-b`}>
                 {t('voice.lang.pairB')}
@@ -834,10 +844,10 @@ export default function VoiceTranslatePage() {
               </select>
             </>
           )}
-        </section>
+        </GlassBentoCard>
 
         {recording ? (
-          <div className="voice-viz glass-panel" aria-live="polite">
+          <GlassBentoCard className="voice-viz bento-voice__viz" aria-live="polite">
             <VoiceWaveform levels={safeLevels} />
             <p className="voice-viz__hint">{t('voice.viz.hint')}</p>
             <p className="voice-viz__timer">
@@ -846,10 +856,13 @@ export default function VoiceTranslatePage() {
                 max: RECORDING_MAX_SECONDS,
               })}
             </p>
-          </div>
+          </GlassBentoCard>
         ) : null}
 
-        <section className="chat-thread glass-panel" aria-label={t('voice.chatAria')}>
+        <GlassBentoCard
+          className="chat-thread bento-voice__chat"
+          aria-label={t('voice.chatAria')}
+        >
           <div className="chat-thread__inner">
             <div className="bubble-row bubble-row--out">
               <article className="bubble bubble--out">
@@ -867,7 +880,7 @@ export default function VoiceTranslatePage() {
                       {bubbleOutLangTag}
                     </span>
                     {canReplaySourceTts ? (
-                      <button
+                      <MotionPressable
                         type="button"
                         className="bubble-tts-replay"
                         onClick={() => void replaySourceTts()}
@@ -886,7 +899,7 @@ export default function VoiceTranslatePage() {
                         >
                           <path d="M8 5v14l11-7L8 5z" />
                         </svg>
-                      </button>
+                      </MotionPressable>
                     ) : null}
                   </div>
                 </header>
@@ -925,7 +938,7 @@ export default function VoiceTranslatePage() {
                       {bubbleInLangTag}
                     </span>
                     {canReplayTranslatedTts ? (
-                      <button
+                      <MotionPressable
                         type="button"
                         className="bubble-tts-replay"
                         onClick={() => void replayTranslatedTts()}
@@ -944,7 +957,7 @@ export default function VoiceTranslatePage() {
                         >
                           <path d="M8 5v14l11-7L8 5z" />
                         </svg>
-                      </button>
+                      </MotionPressable>
                     ) : null}
                   </div>
                 </header>
@@ -966,11 +979,14 @@ export default function VoiceTranslatePage() {
               </motion.article>
             </div>
           </div>
-        </section>
+        </GlassBentoCard>
 
-        <section className="quick-test glass-panel" aria-label={t('voice.quickTest.aria')}>
+        <GlassBentoCard
+          className="quick-test bento-voice__quick"
+          aria-label={t('voice.quickTest.aria')}
+        >
           <div className="quick-test__row">
-            <button
+            <MotionPressable
               type="button"
               className="quick-test__btn"
               onClick={() => void runQuickTranslateTest()}
@@ -979,7 +995,7 @@ export default function VoiceTranslatePage() {
               {quickTestBusy
                 ? t('voice.quickTest.testing')
                 : t('voice.quickTest.button')}
-            </button>
+            </MotionPressable>
             <span className="quick-test__meta">
               {translateMode === 'bidirectional'
                 ? t('voice.quickTest.metaBidirectionalLead', {
@@ -999,9 +1015,9 @@ export default function VoiceTranslatePage() {
                 : t('voice.quickTest.error', { message: quickTestResult.text })}
             </p>
           ) : null}
-        </section>
+        </GlassBentoCard>
 
-        <footer className="controls">
+        <GlassBentoCard className="bento-voice__controls controls">
           <motion.button
             type="button"
             className={[
@@ -1012,6 +1028,8 @@ export default function VoiceTranslatePage() {
               .filter(Boolean)
               .join(' ')}
             style={{ x: micMagnetic.x, y: micMagnetic.y }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 32 }}
             onPointerMove={micMagnetic.onPointerMove}
             onPointerLeave={micMagnetic.onPointerLeave}
             onClick={() => void onMicClick()}
@@ -1069,7 +1087,8 @@ export default function VoiceTranslatePage() {
                   ? t('voice.controls.recordingStop')
                   : t('voice.controls.idleCredentials'))}
           </p>
-        </footer>
+        </GlassBentoCard>
+      </div>
     </main>
   )
 }

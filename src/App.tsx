@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { GlassBentoCard } from './components/GlassBentoCard'
 import { TopNav } from './components/TopNav'
 import SpeakingPracticePage from './pages/SpeakingPracticePage'
 import VoiceTranslatePage from './pages/VoiceTranslatePage'
@@ -20,7 +21,7 @@ function AppShell() {
       </div>
 
       <div className="app-layout">
-        <header className="glass-panel glass-panel--header site-header">
+        <GlassBentoCard className="glass-panel--header site-header">
           <div className="brand">
             <span className="brand__mark" aria-hidden="true">
               <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
@@ -47,7 +48,7 @@ function AppShell() {
             </div>
           </div>
           <TopNav />
-        </header>
+        </GlassBentoCard>
 
         <Routes>
           <Route path="/" element={<Navigate to="/voice" replace />} />
