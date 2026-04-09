@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 
 const links = [
-  { to: "/voice", label: "即時語音" },
+  { to: "/voice", label: "即時翻譯" },
   { to: "/speaking", label: "會話練習" },
 ] as const;
 

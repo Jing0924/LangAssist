@@ -1,7 +1,12 @@
 import type { FormEvent, KeyboardEvent } from "react";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { GlassBentoCard } from "../components/GlassBentoCard";
 import { MotionPressable } from "../components/MotionPressable";
+import {
+  SPEAKING_GUIDE_ORAL_SECTION_ID,
+  SPEAKING_GUIDE_PANEL_ID,
+  SpeakingGuidePanel,
+} from "../components/SpeakingGuidePanel";
 import { AssistantMarkdown } from "../features/speaking/AssistantMarkdown";
 import {
   isGeminiLiveOralMode,
@@ -14,8 +19,57 @@ import { useSpeakingChat } from "../features/speaking/useSpeakingChat";
 import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSessionStore";
 
 const NEAR_BOTTOM_PX = 80;
+const SPEAKING_GUIDE_STORAGE_KEY = "langassist-speaking-guide-open";
 
 export default function SpeakingPracticePage() {
+  const [guideExpanded, setGuideExpanded] = useState(() => {
+    try {
+      return globalThis.localStorage?.getItem(SPEAKING_GUIDE_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem(
+        SPEAKING_GUIDE_STORAGE_KEY,
+        guideExpanded ? "1" : "0",
+      );
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [guideExpanded]);
+
+  const oralGuideScrollPendingRef = useRef(false);
+
+  const openGuide = () => {
+    setGuideExpanded(true);
+  };
+
+  const toggleGuide = () => {
+    setGuideExpanded((v) => !v);
+  };
+
+  const openGuideToOralSection = () => {
+    if (guideExpanded) {
+      globalThis.document
+        .getElementById(SPEAKING_GUIDE_ORAL_SECTION_ID)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    oralGuideScrollPendingRef.current = true;
+    setGuideExpanded(true);
+  };
+
+  useLayoutEffect(() => {
+    if (!guideExpanded || !oralGuideScrollPendingRef.current) return;
+    oralGuideScrollPendingRef.current = false;
+    globalThis.document
+      .getElementById(SPEAKING_GUIDE_ORAL_SECTION_ID)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [guideExpanded]);
+
   const {
     sessions,
     activeId,
@@ -215,21 +269,37 @@ export default function SpeakingPracticePage() {
         <div className="speaking-page__intro">
           <h2 className="speaking-page__title">會話練習</h2>
           <p className="speaking-page__subtitle">
-            在前端直接串接 Gemini 進行文字對話，並可選 Gemini Live 或 Flash
-            Lite 錄音管道口說（後者需 Cloud STT／TTS）。
+            用文字與助手對話練習，必要時搭配麥克風即時或錄音回覆，在同一畫面完成輸入與口說。
           </p>
         </div>
-        <MotionPressable
-          type="button"
-          className="speaking-page__btn-clear"
-          onClick={() => {
-            void clearConversationAll();
-          }}
-          disabled={clearDisabled && !isLiveActive && !isPipelineBusy}
-        >
-          清空對話
-        </MotionPressable>
+        <div className="speaking-page__toolbar-actions">
+          <MotionPressable
+            type="button"
+            className="speaking-page__btn-guide"
+            onClick={toggleGuide}
+            aria-expanded={guideExpanded}
+            aria-controls={SPEAKING_GUIDE_PANEL_ID}
+          >
+            {guideExpanded ? "收合說明" : "設定與說明"}
+          </MotionPressable>
+          <MotionPressable
+            type="button"
+            className="speaking-page__btn-clear"
+            onClick={() => {
+              void clearConversationAll();
+            }}
+            disabled={clearDisabled && !isLiveActive && !isPipelineBusy}
+          >
+            清空對話
+          </MotionPressable>
+        </div>
       </GlassBentoCard>
+
+      {guideExpanded ? (
+        <GlassBentoCard className="speaking-page__guide-wrap">
+          <SpeakingGuidePanel id={SPEAKING_GUIDE_PANEL_ID} />
+        </GlassBentoCard>
+      ) : null}
 
       <div className="speaking-bento">
         <aside className="speaking-bento__aside" aria-label="對話歷史">
@@ -260,9 +330,7 @@ export default function SpeakingPracticePage() {
               新對話
             </MotionPressable>
           </div>
-          <p className="speaking-page__sessions-hint">
-            對話僅存於此瀏覽器（最多 30 則）。
-          </p>
+          <p className="speaking-page__sessions-hint">僅在此裝置</p>
           <ul className="speaking-page__session-list" role="list">
             {sessions.map((s) => {
               const isActive = s.id === activeId;
@@ -330,11 +398,20 @@ export default function SpeakingPracticePage() {
               onScroll={onThreadScroll}
             >
               {messages.length === 0 ? (
-                <p className="speaking-page__empty">
-                  送出訊息或開啟口說練習即可開始。請先在 `.env` 設定 `VITE_GEMINI_API_KEY`、重啟開發伺服器；口說可選 Gemini
-                  Live（即時音訊）或 Flash Lite
-                  管道（需另設 `VITE_GOOGLE_CLOUD_API_KEY` 啟用 STT／TTS），詳見下方說明。
-                </p>
+                <div className="speaking-page__empty speaking-page__empty--cta">
+                  <p className="speaking-page__empty-text">
+                    輸入訊息或開始口說練習即可開場。
+                  </p>
+                  <MotionPressable
+                    type="button"
+                    className="speaking-guide__trigger-link"
+                    onClick={openGuide}
+                    aria-expanded={guideExpanded}
+                    aria-controls={SPEAKING_GUIDE_PANEL_ID}
+                  >
+                    設定與說明
+                  </MotionPressable>
+                </div>
               ) : null}
               {messages.map((m) => {
                 const isUser = m.role === "user";
@@ -399,38 +476,41 @@ export default function SpeakingPracticePage() {
                   {model}
                 </output>
               </label>
-              <label className="speaking-page__model-label">
-                <span className="speaking-page__model-label-text">
-                  口說模式
-                </span>
-                <select
-                  className="speaking-page__model-input speaking-page__model-input--live-select"
-                  value={liveModel}
-                  onChange={(e) => setLiveModel(e.target.value)}
-                  disabled={
-                    isLiveActive ||
-                    liveState === "connecting" ||
-                    isPipelineBusy
-                  }
-                  aria-label="口說模式（Live 或語音管道）"
+              <div className="speaking-page__oral-mode-field">
+                <label className="speaking-page__model-label">
+                  <span className="speaking-page__model-label-text">
+                    口說模式
+                  </span>
+                  <select
+                    className="speaking-page__model-input speaking-page__model-input--live-select"
+                    value={liveModel}
+                    onChange={(e) => setLiveModel(e.target.value)}
+                    disabled={
+                      isLiveActive ||
+                      liveState === "connecting" ||
+                      isPipelineBusy
+                    }
+                    aria-label="口說模式（Live 或語音管道）"
+                  >
+                    {ORAL_MODE_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <MotionPressable
+                  type="button"
+                  className="speaking-page__oral-mode-help"
+                  onClick={openGuideToOralSection}
+                  aria-expanded={guideExpanded}
+                  aria-controls={SPEAKING_GUIDE_PANEL_ID}
+                  aria-label="口說模式說明，開啟設定與說明並捲動至口說模式小節"
                 >
-                  {ORAL_MODE_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  說明
+                </MotionPressable>
+              </div>
             </div>
-            <p className="speaking-page__live-model-hint">
-              <strong>Gemini Live</strong>
-              ：瀏覽器即時麥克風／音訊，只需 `VITE_GEMINI_API_KEY`。
-              <strong> Flash Lite 管道</strong>
-              ：錄音後經 Google Cloud Speech-to-Text → Gemini 2.5 Flash
-              Lite 串流 → Text-to-Speech 英文朗讀；需同一組
-              `VITE_GOOGLE_CLOUD_API_KEY` 並在 GCP 啟用 STT 與 TTS。文字對話仍用上方文字模型；管道口說的 LLM 固定為
-              flash-lite。
-            </p>
 
             <div className="speaking-page__oral" aria-label="口說練習">
               <div className="speaking-page__oral-head">

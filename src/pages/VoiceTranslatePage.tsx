@@ -2,6 +2,10 @@ import { motion } from 'framer-motion'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { GlassBentoCard } from '../components/GlassBentoCard'
 import { MotionPressable } from '../components/MotionPressable'
+import {
+  VOICE_GUIDE_PANEL_ID,
+  VoiceGuidePanel,
+} from '../components/VoiceGuidePanel'
 import { isAbortError } from '../shared/lib/abortError'
 import {
   blobToBase64,
@@ -28,6 +32,8 @@ const RECORDING_MAX_SECONDS = 60
 
 /** Internal state only; UI string is `voice.emptyTranscript`. */
 const EMPTY_TRANSCRIPT_TOKEN = '__EMPTY__'
+
+const VOICE_GUIDE_STORAGE_KEY = 'langassist-voice-guide-open'
 
 type FooterHint =
   | null
@@ -84,10 +90,11 @@ const UI_TEXT: Record<string, string> = {
   'voice.bubble.replayTranslationAria': '重播譯文朗讀',
   'voice.bubble.replayTranslationTitle': '重播譯文朗讀',
   'voice.bubble.placeholderTranslation': '譯文會以對話氣泡顯示，並在完成後自動朗讀。',
-  'voice.quickTest.aria': 'API 快速測試',
+  'voice.quickTest.aria': '連線檢查',
   'voice.quickTest.testing': '測試中…',
-  'voice.quickTest.button': '快速測試翻譯 API',
-  'voice.quickTest.metaOneWayLead': '使用目前「目標語言」；',
+  'voice.quickTest.button': '測試翻譯連線',
+  'voice.quickTest.hint':
+    '送出一則測試訊息，確認翻譯服務是否可用。',
   'voice.controls.micStop': '停止並辨識翻譯',
   'voice.controls.micStart': '開始錄音',
   'voice.controls.processingRecognizing': '語音辨識進行中…',
@@ -95,7 +102,7 @@ const UI_TEXT: Record<string, string> = {
   'voice.controls.processingSpeaking': '播放譯文朗讀…',
   'voice.controls.processingGeneric': '處理中…',
   'voice.controls.recordingStop': '再次點擊或空白鍵結束錄音',
-  'voice.controls.idleCredentials': '空白鍵或點擊麥克風開始；憑證為 API 金鑰，詳見 .env.example',
+  'voice.controls.idleCredentials': '空白鍵或點擊麥克風開始',
   'voice.hints.noAudioBlob': '沒有錄到音訊，請再試一次。',
   'voice.hints.emptyRecognize': '辨識結果為空，請靠近麥克風或說大聲一點。',
   'voice.hints.bidirectionalUnknown': '無法判斷為已選的兩種語言之一，請再試一次或交換語言 A/B（主／輔辨識）。',
@@ -103,9 +110,8 @@ const UI_TEXT: Record<string, string> = {
   'voice.hints.micDenied': '無法存取麥克風，請確認瀏覽器權限。',
   'voice.hints.sourceReplayFailed': '原文朗讀失敗：{{message}}',
   'voice.hints.translationReplayFailed': '譯文朗讀失敗：{{message}}',
-  'voice.quickTest.metaBidirectionalLead': '使用目前雙向配對的語言 B（{{label}}）；',
-  'voice.quickTest.success': '成功：{{result}}',
-  'voice.quickTest.error': '失敗：{{message}}',
+  'voice.quickTest.success': '連線正常。範例譯文：{{result}}',
+  'voice.quickTest.error': '無法連線：{{message}}',
   'voice.viz.timer': '{{current}} / {{max}} 秒（達上限將自動停止並辨識）',
 }
 
@@ -187,12 +193,34 @@ export default function VoiceTranslatePage() {
   const [quickTestBusy, setQuickTestBusy] = useState(false)
   const [replayTtsBusy, setReplayTtsBusy] = useState(false)
   const [recordingElapsedSec, setRecordingElapsedSec] = useState(0)
+  const [guideExpanded, setGuideExpanded] = useState(() => {
+    try {
+      return globalThis.localStorage?.getItem(VOICE_GUIDE_STORAGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
 
   const pipelineAbortRef = useRef<AbortController | null>(null)
   const quickTestAbortRef = useRef<AbortController | null>(null)
   const micActionRef = useRef<() => void>(() => {})
 
   const { stopTtsPlayback, playTranslatedTts } = useTtsPlayback()
+
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem(
+        VOICE_GUIDE_STORAGE_KEY,
+        guideExpanded ? '1' : '0',
+      )
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [guideExpanded])
+
+  const toggleGuide = () => {
+    setGuideExpanded((v) => !v)
+  }
 
   const abortPipeline = useCallback(() => {
     pipelineAbortRef.current?.abort()
@@ -657,39 +685,66 @@ export default function VoiceTranslatePage() {
             <h2 className="voice-page__title">{t('voice.toolbar.title')}</h2>
             <p className="voice-page__hint">{t('voice.toolbar.subtitle')}</p>
           </div>
-          <div
-            className={[
-              'status-pill',
-              phase === 'listening' ? 'status-pill--live' : '',
-              phase === 'idle' ? '' : '',
-              phase === 'recognizing' ? 'status-pill--recognizing' : '',
-              phase === 'translating' ? 'status-pill--translating' : '',
-              phase === 'speaking' ? 'status-pill--speaking' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            role="status"
-            aria-live="polite"
-          >
-            <span className="status-pill__dot" aria-hidden="true" />
-            <span className="status-pill__label">{statusLabel}</span>
-            {phase === 'recognizing' ? (
-              <span className="status-pill__waves" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </span>
-            ) : null}
-            {phase === 'translating' ? (
-              <span className="status-pill__orbit" aria-hidden="true" />
-            ) : null}
-            {phase === 'speaking' ? (
-              <span className="status-pill__note" aria-hidden="true">
-                ♪
-              </span>
-            ) : null}
+          <div className="voice-page__toolbar-right">
+            <div
+              className={[
+                'status-pill',
+                phase === 'listening' ? 'status-pill--live' : '',
+                phase === 'idle' ? '' : '',
+                phase === 'recognizing' ? 'status-pill--recognizing' : '',
+                phase === 'translating' ? 'status-pill--translating' : '',
+                phase === 'speaking' ? 'status-pill--speaking' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="status-pill__dot" aria-hidden="true" />
+              <span className="status-pill__label">{statusLabel}</span>
+              {phase === 'recognizing' ? (
+                <span className="status-pill__waves" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              ) : null}
+              {phase === 'translating' ? (
+                <span className="status-pill__orbit" aria-hidden="true" />
+              ) : null}
+              {phase === 'speaking' ? (
+                <span className="status-pill__note" aria-hidden="true">
+                  ♪
+                </span>
+              ) : null}
+            </div>
+            <div className="voice-page__toolbar-actions">
+              <MotionPressable
+                type="button"
+                className="voice-page__btn-guide"
+                onClick={toggleGuide}
+                aria-expanded={guideExpanded}
+                aria-controls={VOICE_GUIDE_PANEL_ID}
+              >
+                {guideExpanded ? '收合說明' : '新手導引'}
+              </MotionPressable>
+            </div>
           </div>
         </GlassBentoCard>
+
+        {guideExpanded ? (
+          <GlassBentoCard className="voice-page__guide-wrap bento-voice__guide">
+            <VoiceGuidePanel
+              id={VOICE_GUIDE_PANEL_ID}
+              translateMode={translateMode}
+              connectionCheckTargetLabel={
+                translateMode === 'bidirectional'
+                  ? languageLabel(pairLangB)
+                  : languageLabel(targetLang)
+              }
+            />
+          </GlassBentoCard>
+        ) : null}
 
         <GlassBentoCard className="lang-bar bento-voice__lang" aria-label={t('voice.langBarAria')}>
           <div
@@ -985,7 +1040,7 @@ export default function VoiceTranslatePage() {
           className="quick-test bento-voice__quick"
           aria-label={t('voice.quickTest.aria')}
         >
-          <div className="quick-test__row">
+          <div className="quick-test__row quick-test__row--stack">
             <MotionPressable
               type="button"
               className="quick-test__btn"
@@ -996,15 +1051,7 @@ export default function VoiceTranslatePage() {
                 ? t('voice.quickTest.testing')
                 : t('voice.quickTest.button')}
             </MotionPressable>
-            <span className="quick-test__meta">
-              {translateMode === 'bidirectional'
-                ? t('voice.quickTest.metaBidirectionalLead', {
-                    label: languageLabel(pairLangB),
-                  })
-                : t('voice.quickTest.metaOneWayLead')}
-              需已在根目錄 <code className="quick-test__code">.env</code> 設定{' '}
-              <code className="quick-test__code">VITE_GOOGLE_CLOUD_API_KEY</code>
-            </span>
+            <p className="quick-test__hint">{t('voice.quickTest.hint')}</p>
           </div>
           {quickTestResult ? (
             <p
