@@ -1,7 +1,7 @@
 import { motion, type HTMLMotionProps } from "framer-motion";
 import { forwardRef } from "react";
 
-const tap = { scale: 0.97 };
+const tap = { scale: 0.92 };
 const transition = { type: "spring" as const, stiffness: 520, damping: 32 };
 
 export const MotionPressable = forwardRef<

@@ -1075,7 +1075,7 @@ export default function VoiceTranslatePage() {
               .filter(Boolean)
               .join(' ')}
             style={{ x: micMagnetic.x, y: micMagnetic.y }}
-            whileTap={{ scale: 0.96 }}
+            whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 520, damping: 32 }}
             onPointerMove={micMagnetic.onPointerMove}
             onPointerLeave={micMagnetic.onPointerLeave}

@@ -1,5 +1,13 @@
 import type { FormEvent, KeyboardEvent } from "react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { History, Settings2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { GlassBentoCard } from "../components/GlassBentoCard";
 import { MotionPressable } from "../components/MotionPressable";
 import {
@@ -17,9 +25,110 @@ import { useGeminiLiveSpeaking } from "../features/speaking/useGeminiLiveSpeakin
 import { usePipelineOralSpeaking } from "../features/speaking/usePipelineOralSpeaking";
 import { useSpeakingChat } from "../features/speaking/useSpeakingChat";
 import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSessionStore";
+import type { SpeakingSession } from "../features/speaking/types";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const NEAR_BOTTOM_PX = 80;
 const SPEAKING_GUIDE_STORAGE_KEY = "langassist-speaking-guide-open";
+const SPEAKING_HISTORY_PANEL_ID = "speaking-history-panel";
+
+type SpeakingHistoryCardProps = {
+  sessions: SpeakingSession[];
+  activeId: string;
+  newChatDisabled: boolean;
+  dateFmt: Intl.DateTimeFormat;
+  onNewChat: () => void;
+  onSelectSession: (id: string) => void;
+  onDeleteSession: (id: string) => void;
+  /** Called after mobile drawer should close (select / new chat) */
+  onNavigateMobile?: () => void;
+};
+
+function SpeakingHistoryCard({
+  sessions,
+  activeId,
+  newChatDisabled,
+  dateFmt,
+  onNewChat,
+  onSelectSession,
+  onDeleteSession,
+  onNavigateMobile,
+}: SpeakingHistoryCardProps) {
+  const wrapMobile = (fn: () => void) => {
+    fn();
+    onNavigateMobile?.();
+  };
+
+  return (
+    <GlassBentoCard className="speaking-page__sidebar speaking-bento__sidebar-card">
+      <div className="speaking-page__sidebar-head">
+        <h3 className="speaking-page__sidebar-title">對話歷史</h3>
+        {newChatDisabled ? (
+          <span id="speaking-new-chat-disabled-hint" className="sr-only">
+            請先在此對話送出至少一則訊息，才能建立新對話。
+          </span>
+        ) : null}
+        <MotionPressable
+          type="button"
+          className="speaking-page__btn-new"
+          onClick={() => wrapMobile(onNewChat)}
+          disabled={newChatDisabled}
+          title={
+            newChatDisabled
+              ? "請先在此對話送出至少一則訊息，才能建立新對話。"
+              : undefined
+          }
+          aria-describedby={
+            newChatDisabled ? "speaking-new-chat-disabled-hint" : undefined
+          }
+        >
+          新對話
+        </MotionPressable>
+      </div>
+      <p className="speaking-page__sessions-hint">僅在此裝置</p>
+      <ul className="speaking-page__session-list" role="list">
+        {sessions.map((s) => {
+          const isActive = s.id === activeId;
+          const label = s.title ?? "新對話";
+          return (
+            <li key={s.id} className="speaking-page__session-li">
+              <div
+                className={`speaking-page__session-item${isActive ? " speaking-page__session-item--active" : ""}`}
+              >
+                <MotionPressable
+                  type="button"
+                  className="speaking-page__session-select"
+                  onClick={() => wrapMobile(() => onSelectSession(s.id))}
+                >
+                  <span className="speaking-page__session-title">
+                    {label}
+                  </span>
+                  <time
+                    className="speaking-page__session-time"
+                    dateTime={new Date(s.updatedAt).toISOString()}
+                  >
+                    {dateFmt.format(s.updatedAt)}
+                  </time>
+                </MotionPressable>
+                <MotionPressable
+                  type="button"
+                  className="speaking-page__session-delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    wrapMobile(() => onDeleteSession(s.id));
+                  }}
+                  aria-label={`刪除對話：${label}`}
+                >
+                  刪除
+                </MotionPressable>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </GlassBentoCard>
+  );
+}
 
 export default function SpeakingPracticePage() {
   const [guideExpanded, setGuideExpanded] = useState(() => {
@@ -263,6 +372,40 @@ export default function SpeakingPracticePage() {
     deleteSession(id);
   };
 
+  const isDesktop = useMediaQuery("(min-width: 801px)");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const drawerPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const closeHistory = useCallback(() => {
+    setHistoryOpen(false);
+    requestAnimationFrame(() => historyTriggerRef.current?.focus());
+  }, []);
+
+  const historyDrawerOpen = historyOpen && !isDesktop;
+
+  useEffect(() => {
+    if (!historyDrawerOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") closeHistory();
+    };
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
+  }, [historyDrawerOpen, closeHistory]);
+
+  useEffect(() => {
+    if (!historyDrawerOpen) return;
+    const id = requestAnimationFrame(() => {
+      const root = drawerPanelRef.current;
+      if (!root) return;
+      const el = root.querySelector<HTMLElement>(
+        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
+      );
+      el?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [historyDrawerOpen]);
+
   return (
     <div className="speaking-page">
       <GlassBentoCard className="glass-panel--header speaking-page__toolbar">
@@ -273,14 +416,40 @@ export default function SpeakingPracticePage() {
           </p>
         </div>
         <div className="speaking-page__toolbar-actions">
+          {!isDesktop ? (
+            <MotionPressable
+              ref={historyTriggerRef}
+              type="button"
+              className="speaking-page__btn-history"
+              onClick={() => setHistoryOpen((v) => !v)}
+              aria-expanded={historyDrawerOpen}
+              aria-controls={SPEAKING_HISTORY_PANEL_ID}
+              aria-label="對話歷史"
+              title="對話歷史"
+            >
+              <History size={18} aria-hidden className="speaking-page__btn-history-icon" />
+              <span className="speaking-page__btn-history-label">歷史</span>
+            </MotionPressable>
+          ) : null}
           <MotionPressable
             type="button"
             className="speaking-page__btn-guide"
             onClick={toggleGuide}
             aria-expanded={guideExpanded}
             aria-controls={SPEAKING_GUIDE_PANEL_ID}
+            title={guideExpanded ? "收合說明" : "設定與說明"}
           >
-            {guideExpanded ? "收合說明" : "設定與說明"}
+            <Settings2
+              size={18}
+              aria-hidden
+              className="speaking-page__btn-guide-icon"
+            />
+            <span className="speaking-page__btn-guide-label speaking-page__btn-guide-label--full">
+              {guideExpanded ? "收合說明" : "設定與說明"}
+            </span>
+            <span className="speaking-page__btn-guide-label speaking-page__btn-guide-label--short">
+              {guideExpanded ? "收合" : "說明"}
+            </span>
           </MotionPressable>
           <MotionPressable
             type="button"
@@ -302,77 +471,53 @@ export default function SpeakingPracticePage() {
       ) : null}
 
       <div className="speaking-bento">
-        <aside className="speaking-bento__aside" aria-label="對話歷史">
-          <GlassBentoCard className="speaking-page__sidebar speaking-bento__sidebar-card">
-          <div className="speaking-page__sidebar-head">
-            <h3 className="speaking-page__sidebar-title">
-              對話歷史
-            </h3>
-            {newChatDisabled ? (
-              <span id="speaking-new-chat-disabled-hint" className="sr-only">
-                請先在此對話送出至少一則訊息，才能建立新對話。
-              </span>
+        {isDesktop ? (
+          <aside className="speaking-bento__aside" aria-label="對話歷史">
+            <SpeakingHistoryCard
+              sessions={sessions}
+              activeId={activeId}
+              newChatDisabled={newChatDisabled}
+              dateFmt={dateFmt}
+              onNewChat={onNewChat}
+              onSelectSession={onSelectSession}
+              onDeleteSession={onDeleteSession}
+            />
+          </aside>
+        ) : null}
+
+        {!isDesktop ? (
+          <>
+            {historyDrawerOpen ? (
+              <button
+                type="button"
+                className="speaking-drawer__backdrop"
+                aria-label="關閉對話歷史"
+                onClick={closeHistory}
+              />
             ) : null}
-            <MotionPressable
-              type="button"
-              className="speaking-page__btn-new"
-              onClick={onNewChat}
-              disabled={newChatDisabled}
-              title={
-                newChatDisabled
-                  ? "請先在此對話送出至少一則訊息，才能建立新對話。"
-                  : undefined
-              }
-              aria-describedby={
-                newChatDisabled ? "speaking-new-chat-disabled-hint" : undefined
-              }
+            <div
+              ref={drawerPanelRef}
+              id={SPEAKING_HISTORY_PANEL_ID}
+              className={`speaking-drawer${historyDrawerOpen ? " speaking-drawer--open" : ""}`}
+              role="dialog"
+              aria-modal="true"
+              aria-hidden={!historyDrawerOpen}
+              aria-label="對話歷史"
+              inert={historyDrawerOpen ? undefined : true}
             >
-              新對話
-            </MotionPressable>
-          </div>
-          <p className="speaking-page__sessions-hint">僅在此裝置</p>
-          <ul className="speaking-page__session-list" role="list">
-            {sessions.map((s) => {
-              const isActive = s.id === activeId;
-              const label = s.title ?? "新對話";
-              return (
-                <li key={s.id} className="speaking-page__session-li">
-                  <div
-                    className={`speaking-page__session-item${isActive ? " speaking-page__session-item--active" : ""}`}
-                  >
-                    <MotionPressable
-                      type="button"
-                      className="speaking-page__session-select"
-                      onClick={() => onSelectSession(s.id)}
-                    >
-                      <span className="speaking-page__session-title">
-                        {label}
-                      </span>
-                      <time
-                        className="speaking-page__session-time"
-                        dateTime={new Date(s.updatedAt).toISOString()}
-                      >
-                        {dateFmt.format(s.updatedAt)}
-                      </time>
-                    </MotionPressable>
-                    <MotionPressable
-                      type="button"
-                      className="speaking-page__session-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteSession(s.id);
-                      }}
-                      aria-label={`刪除對話：${label}`}
-                    >
-                      刪除
-                    </MotionPressable>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          </GlassBentoCard>
-        </aside>
+              <SpeakingHistoryCard
+                sessions={sessions}
+                activeId={activeId}
+                newChatDisabled={newChatDisabled}
+                dateFmt={dateFmt}
+                onNewChat={onNewChat}
+                onSelectSession={onSelectSession}
+                onDeleteSession={onDeleteSession}
+                onNavigateMobile={closeHistory}
+              />
+            </div>
+          </>
+        ) : null}
 
         <GlassBentoCard
           className="speaking-page__panel"
@@ -512,6 +657,7 @@ export default function SpeakingPracticePage() {
               </div>
             </div>
 
+            <div className="speaking-page__thumb-zone">
             <div className="speaking-page__oral" aria-label="口說練習">
               <div className="speaking-page__oral-head">
                 <span className="speaking-page__oral-title">口說練習</span>
@@ -669,6 +815,7 @@ export default function SpeakingPracticePage() {
               >
                 送出
               </MotionPressable>
+            </div>
             </div>
           </form>
         </GlassBentoCard>

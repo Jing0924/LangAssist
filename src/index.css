@@ -17,6 +17,12 @@
   color-scheme: dark;
 }
 
+@media (max-width: 640px) {
+  :root {
+    --glass-bg: oklch(1 0 0 / 0.14);
+  }
+}
+
 *,
 *::before,
 *::after {
