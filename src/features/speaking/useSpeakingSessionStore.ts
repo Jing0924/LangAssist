@@ -1,6 +1,10 @@
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DEFAULT_SPEAKING_MODEL, normalizeStoredLiveModelId } from "./speakingDefaults";
+import {
+  DEFAULT_SPEAKING_MODEL,
+  normalizeStoredLiveModelId,
+  normalizeStoredSpeakingTextModel,
+} from "./speakingDefaults";
 import {
   createEmptySession,
   loadSpeakingSessions,
@@ -70,13 +74,14 @@ export function useSpeakingSessionStore() {
   );
 
   const setModel = useCallback((value: string) => {
+    const nextModel = normalizeStoredSpeakingTextModel(value);
     setState((prev) => {
       const idx = prev.sessions.findIndex((s) => s.id === prev.activeId);
       if (idx === -1) return prev;
       const s = prev.sessions[idx];
       const updated: SpeakingSession = {
         ...s,
-        model: value,
+        model: nextModel,
         updatedAt: Date.now(),
       };
       const sessions = [...prev.sessions];
@@ -118,7 +123,7 @@ export function useSpeakingSessionStore() {
     setState((prev) => {
       const current = prev.sessions.find((s) => s.id === prev.activeId);
       if (current && current.messages.length === 0) return prev;
-      const model = current?.model?.trim() || DEFAULT_SPEAKING_MODEL;
+      const model = normalizeStoredSpeakingTextModel(current?.model);
       const liveModel = normalizeStoredLiveModelId(current?.liveModel);
       const next = createEmptySession(model, liveModel);
       let combined = [next, ...prev.sessions];
@@ -151,7 +156,7 @@ export function useSpeakingSessionStore() {
     activeId: state.activeId,
     messages: activeSession?.messages ?? [],
     setMessages,
-    model: activeSession?.model ?? DEFAULT_SPEAKING_MODEL,
+    model: normalizeStoredSpeakingTextModel(activeSession?.model),
     setModel,
     liveModel: normalizeStoredLiveModelId(activeSession?.liveModel),
     setLiveModel,

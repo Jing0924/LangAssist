@@ -72,7 +72,7 @@ export function SpeakingGuidePanel({ id }: SpeakingGuidePanelProps) {
             ，並在 Google Cloud 專案中啟用 STT 與 TTS API。
           </li>
           <li>
-            文字聊天使用上方顯示的文字模型；管道口說的 LLM 固定為 flash-lite，與文字模型選項無關。
+            文字聊天使用側欄選擇的文字模型；管道口說的 LLM 固定為 flash-lite，與文字模型選項無關。
           </li>
         </ul>
       </section>

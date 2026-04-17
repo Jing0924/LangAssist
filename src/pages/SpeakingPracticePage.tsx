@@ -11,7 +11,6 @@ import {
 import { GlassBentoCard } from "../components/GlassBentoCard";
 import { MotionPressable } from "../components/MotionPressable";
 import {
-  SPEAKING_GUIDE_ORAL_SECTION_ID,
   SPEAKING_GUIDE_PANEL_ID,
   SpeakingGuidePanel,
 } from "../components/SpeakingGuidePanel";
@@ -20,6 +19,7 @@ import {
   isGeminiLiveOralMode,
   isPipelineOralMode,
   ORAL_MODE_OPTIONS,
+  SPEAKING_TEXT_MODEL_OPTIONS,
 } from "../features/speaking/speakingDefaults";
 import { useGeminiLiveSpeaking } from "../features/speaking/useGeminiLiveSpeaking";
 import { usePipelineOralSpeaking } from "../features/speaking/usePipelineOralSpeaking";
@@ -116,8 +116,7 @@ function SpeakingHistoryCard({
               <div
                 className={cn(
                   "flex items-stretch gap-[0.35rem] rounded-[10px] border border-transparent bg-white/[0.04] transition-[border-color,background]",
-                  isActive &&
-                    "border-sky-400/45 bg-sky-400/15",
+                  isActive && "border-sky-400/45 bg-sky-400/15",
                 )}
               >
                 <MotionPressable
@@ -163,7 +162,9 @@ function SpeakingHistoryCard({
 export default function SpeakingPracticePage() {
   const [guideExpanded, setGuideExpanded] = useState(() => {
     try {
-      return globalThis.localStorage?.getItem(SPEAKING_GUIDE_STORAGE_KEY) === "1";
+      return (
+        globalThis.localStorage?.getItem(SPEAKING_GUIDE_STORAGE_KEY) === "1"
+      );
     } catch {
       return false;
     }
@@ -180,8 +181,6 @@ export default function SpeakingPracticePage() {
     }
   }, [guideExpanded]);
 
-  const oralGuideScrollPendingRef = useRef(false);
-
   const openGuide = () => {
     setGuideExpanded(true);
   };
@@ -190,31 +189,13 @@ export default function SpeakingPracticePage() {
     setGuideExpanded((v) => !v);
   };
 
-  const openGuideToOralSection = () => {
-    if (guideExpanded) {
-      globalThis.document
-        .getElementById(SPEAKING_GUIDE_ORAL_SECTION_ID)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    oralGuideScrollPendingRef.current = true;
-    setGuideExpanded(true);
-  };
-
-  useLayoutEffect(() => {
-    if (!guideExpanded || !oralGuideScrollPendingRef.current) return;
-    oralGuideScrollPendingRef.current = false;
-    globalThis.document
-      .getElementById(SPEAKING_GUIDE_ORAL_SECTION_ID)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [guideExpanded]);
-
   const {
     sessions,
     activeId,
     messages,
     setMessages,
     model,
+    setModel,
     liveModel,
     setLiveModel,
     switchSession,
@@ -237,19 +218,14 @@ export default function SpeakingPracticePage() {
     sessionKey: activeId,
   });
 
-  const {
-    liveState,
-    liveError,
-    isLiveActive,
-    startLive,
-    stopLive,
-  } = useGeminiLiveSpeaking({
-    messages,
-    setMessages,
-    liveModelId: liveModel,
-    sessionKey: activeId,
-    disabled: !isGeminiLiveOralMode(liveModel),
-  });
+  const { liveState, liveError, isLiveActive, startLive, stopLive } =
+    useGeminiLiveSpeaking({
+      messages,
+      setMessages,
+      liveModelId: liveModel,
+      sessionKey: activeId,
+      disabled: !isGeminiLiveOralMode(liveModel),
+    });
 
   const {
     pipelineState,
@@ -560,342 +536,373 @@ export default function SpeakingPracticePage() {
           </>
         ) : null}
 
-        <GlassBentoCard
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-[clamp(1rem,2.5vw,1.25rem)]"
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
           aria-labelledby="speaking-heading"
         >
           <h2 id="speaking-heading" className="sr-only">
             會話練習
           </h2>
 
-          {error ? (
-            <p className="m-0 text-[0.9rem] leading-normal text-danger" role="alert">
-              {error}
-            </p>
-          ) : null}
+          <GlassBentoCard className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-[clamp(1rem,2.5vw,1.25rem)]">
+            {error ? (
+              <p
+                className="m-0 text-[0.9rem] leading-normal text-danger"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
 
-          <section
-            className="flex min-h-[220px] max-h-[min(52vh,480px)] flex-1 flex-col overflow-hidden p-0"
-            aria-label="會話練習對話"
-          >
-            <div
-              ref={threadInnerRef}
-              className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[1.1rem] pt-4"
-              onScroll={onThreadScroll}
+            <section
+              className="flex min-h-[220px] max-h-[min(52vh,480px)] flex-1 flex-col overflow-hidden p-0"
+              aria-label="會話練習對話"
             >
-              {messages.length === 0 ? (
-                <div className="m-0 flex flex-col items-start gap-[0.65rem] text-[0.875rem] leading-normal text-muted">
-                  <p className="m-0">
-                    輸入訊息或開始口說練習即可開場。
-                  </p>
-                  <MotionPressable
-                    type="button"
-                    className="cursor-pointer self-start border-0 bg-transparent p-0 font-inherit text-[0.8125rem] font-semibold text-accent underline decoration-accent underline-offset-[0.15em] hover:text-foreground focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    onClick={openGuide}
-                    aria-expanded={guideExpanded}
-                    aria-controls={SPEAKING_GUIDE_PANEL_ID}
-                  >
-                    設定與說明
-                  </MotionPressable>
-                </div>
-              ) : null}
-              {messages.map((m) => {
-                const isUser = m.role === "user";
-                const assistantStreaming =
-                  (isStreaming && !isLiveActive) ||
-                  (pipelineMode && isPipelineReplying);
-                const showCaret =
-                  assistantStreaming &&
-                  !isUser &&
-                  m.id === lastId &&
-                  m.role === "assistant";
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "flex w-full",
-                      isUser ? "justify-end" : "justify-start",
-                    )}
-                  >
-                    <article
+              <div
+                ref={threadInnerRef}
+                className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[1.1rem] pt-4"
+                onScroll={onThreadScroll}
+              >
+                {messages.length === 0 ? (
+                  <div className="m-0 flex flex-col items-start gap-[0.65rem] text-[0.875rem] leading-normal text-muted">
+                    <p className="m-0">輸入訊息或開始口說練習即可開場。</p>
+                    <MotionPressable
+                      type="button"
+                      className="cursor-pointer self-start border-0 bg-transparent p-0 font-inherit text-[0.8125rem] font-semibold text-accent underline decoration-accent underline-offset-[0.15em] hover:text-foreground focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      onClick={openGuide}
+                      aria-expanded={guideExpanded}
+                      aria-controls={SPEAKING_GUIDE_PANEL_ID}
+                    >
+                      設定與說明
+                    </MotionPressable>
+                  </div>
+                ) : null}
+                {messages.map((m) => {
+                  const isUser = m.role === "user";
+                  const assistantStreaming =
+                    (isStreaming && !isLiveActive) ||
+                    (pipelineMode && isPipelineReplying);
+                  const showCaret =
+                    assistantStreaming &&
+                    !isUser &&
+                    m.id === lastId &&
+                    m.role === "assistant";
+                  return (
+                    <div
+                      key={m.id}
                       className={cn(
-                        "relative max-w-[min(92%,560px)] rounded-[20px] px-[0.85rem] pb-3 pt-[0.65rem] shadow-[0_6px_28px_rgba(0,0,0,0.22)] max-[540px]:max-w-full",
-                        isUser
-                          ? "ml-8 rounded-br-md border border-[oklch(0.82_0.14_200/0.35)] bg-[linear-gradient(155deg,oklch(0.82_0.14_200/0.2)_0%,oklch(0.22_0.06_270/0.55)_100%)] max-[540px]:ml-2"
-                          : "mr-8 rounded-bl-md border border-white/12 bg-[linear-gradient(155deg,oklch(0.92_0.02_260/0.12)_0%,oklch(0.2_0.05_270/0.68)_100%)] max-[540px]:mr-2",
+                        "flex w-full",
+                        isUser ? "justify-end" : "justify-start",
                       )}
                     >
-                      <header className="mb-[0.35rem] flex items-baseline justify-between gap-2">
-                        <span
+                      <article
+                        className={cn(
+                          "relative max-w-[min(92%,560px)] rounded-[20px] px-[0.85rem] pb-3 pt-[0.65rem] shadow-[0_6px_28px_rgba(0,0,0,0.22)] max-[540px]:max-w-full",
+                          isUser
+                            ? "ml-8 rounded-br-md border border-[oklch(0.82_0.14_200/0.35)] bg-[linear-gradient(155deg,oklch(0.82_0.14_200/0.2)_0%,oklch(0.22_0.06_270/0.55)_100%)] max-[540px]:ml-2"
+                            : "mr-8 rounded-bl-md border border-white/12 bg-[linear-gradient(155deg,oklch(0.92_0.02_260/0.12)_0%,oklch(0.2_0.05_270/0.68)_100%)] max-[540px]:mr-2",
+                        )}
+                      >
+                        <header className="mb-[0.35rem] flex items-baseline justify-between gap-2">
+                          <span
+                            className={cn(
+                              "text-[0.72rem] font-bold uppercase tracking-[0.06em] text-muted",
+                              isUser && "text-cyan-400/85",
+                            )}
+                          >
+                            {isUser ? "你" : "助手"}
+                          </span>
+                        </header>
+                        <div
                           className={cn(
-                            "text-[0.72rem] font-bold uppercase tracking-[0.06em] text-muted",
-                            isUser && "text-cyan-400/85",
+                            "break-words text-[1.02rem] leading-relaxed",
+                            isUser
+                              ? "text-foreground"
+                              : `text-secondary ${assistantMarkdownProse}`,
                           )}
                         >
-                          {isUser
-                            ? "你"
-                            : "助手"}
-                        </span>
-                      </header>
-                      <div
-                        className={cn(
-                          "break-words text-[1.02rem] leading-relaxed",
-                          isUser ? "text-foreground" : `text-secondary ${assistantMarkdownProse}`,
-                        )}
-                      >
-                        {m.content ? (
-                          isUser ? (
-                            m.content
+                          {m.content ? (
+                            isUser ? (
+                              m.content
+                            ) : (
+                              <AssistantMarkdown content={m.content} />
+                            )
+                          ) : showCaret ? (
+                            <span
+                              className="inline-block h-[1em] w-0.5 animate-caret-blink rounded-sm bg-current align-[-0.12em] opacity-55"
+                              aria-hidden="true"
+                            />
                           ) : (
-                            <AssistantMarkdown content={m.content} />
-                          )
-                        ) : showCaret ? (
-                          <span
-                            className="inline-block h-[1em] w-0.5 animate-caret-blink rounded-sm bg-current align-[-0.12em] opacity-55"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <span className="text-[0.9375rem] text-muted">…</span>
-                        )}
-                        {m.content && showCaret ? (
-                          <span
-                            className="inline-block h-[1em] w-0.5 animate-caret-blink rounded-sm bg-current align-[-0.12em] opacity-55"
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                      </div>
-                    </article>
+                            <span className="text-[0.9375rem] text-muted">
+                              …
+                            </span>
+                          )}
+                          {m.content && showCaret ? (
+                            <span
+                              className="inline-block h-[1em] w-0.5 animate-caret-blink rounded-sm bg-current align-[-0.12em] opacity-55"
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                        </div>
+                      </article>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </GlassBentoCard>
+
+          <GlassBentoCard className="flex min-h-0 min-w-0 shrink-0 flex-col p-[clamp(1rem,2.5vw,1.25rem)]">
+            <form className="flex shrink-0 flex-col gap-3" onSubmit={onSubmit}>
+              <div className="flex flex-col gap-3 max-[800px]:sticky max-[800px]:bottom-0 max-[800px]:z-20 max-[800px]:-mx-[clamp(1rem,2.5vw,1.25rem)] max-[800px]:mt-auto max-[800px]:mb-[calc(-1*clamp(1rem,2.5vw,1.25rem))] max-[800px]:rounded-t-[18px] max-[800px]:border max-[800px]:border-white/10 max-[800px]:bg-[oklch(0.17_0.055_275/0.82)] max-[800px]:px-[clamp(1rem,2.5vw,1.25rem)] max-[800px]:py-[0.85rem] max-[800px]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] max-[800px]:shadow-[0_-12px_40px_oklch(0.08_0.04_280/0.4),inset_0_1px_0_var(--glass-highlight)] max-[800px]:backdrop-blur-[22px]">
+                <div
+                  className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[rgb(15_23_42/0.28)] px-[0.85rem] py-3"
+                  aria-label="口說練習"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <span className="text-[0.8125rem] font-[650] uppercase tracking-[0.04em] text-muted">
+                      口說練習
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[0.8125rem] font-semibold text-secondary",
+                        (liveState === "listening" || oralStatusActive) &&
+                          "text-accent",
+                      )}
+                      aria-live="polite"
+                    >
+                      {oralStatusLabel}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <form className="flex shrink-0 flex-col gap-3" onSubmit={onSubmit}>
-            <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
-              <label className="flex min-w-0 flex-col gap-[0.35rem]">
-                <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted">
-                  文字模型
-                </span>
-                <output
-                  className="inline-flex max-w-md min-h-9 items-center text-ellipsis whitespace-nowrap rounded-[10px] border border-white/12 bg-[rgb(15_23_42/0.35)] px-3 py-2 font-sans text-sm font-medium text-foreground"
-                  aria-live="polite"
-                >
-                  {model}
-                </output>
-              </label>
-              <div className="flex min-w-0 flex-wrap items-end gap-x-2 gap-y-2">
-                <label className="flex min-w-[min(100%,12rem)] flex-1 flex-col gap-[0.35rem]">
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted">
-                    口說模式
-                  </span>
-                  <select
-                    className={cn(
-                      nativeGlassSelect,
-                      speakingLiveSelect,
-                      "inline-flex min-h-9 w-full max-w-none items-center",
-                    )}
-                    value={liveModel}
-                    onChange={(e) => setLiveModel(e.target.value)}
-                    disabled={
-                      isLiveActive ||
-                      liveState === "connecting" ||
-                      isPipelineBusy
-                    }
-                    aria-label="口說模式（Live 或語音管道）"
-                  >
-                    {ORAL_MODE_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <MotionPressable
-                  type="button"
-                  className="mb-[0.05rem] shrink-0 cursor-pointer rounded-lg border border-white/[0.14] bg-white/[0.05] px-[0.65rem] py-[0.35rem] font-sans text-xs font-semibold text-secondary transition-[background,border-color,color] hover:border-sky-400/40 hover:bg-sky-400/15 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  onClick={openGuideToOralSection}
-                  aria-expanded={guideExpanded}
-                  aria-controls={SPEAKING_GUIDE_PANEL_ID}
-                  aria-label="口說模式說明，開啟設定與說明並捲動至口說模式小節"
-                >
-                  說明
-                </MotionPressable>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 max-[800px]:sticky max-[800px]:bottom-0 max-[800px]:z-20 max-[800px]:-mx-[clamp(1rem,2.5vw,1.25rem)] max-[800px]:mt-auto max-[800px]:mb-[calc(-1*clamp(1rem,2.5vw,1.25rem))] max-[800px]:rounded-t-[18px] max-[800px]:border max-[800px]:border-white/10 max-[800px]:bg-[oklch(0.17_0.055_275/0.82)] max-[800px]:px-[clamp(1rem,2.5vw,1.25rem)] max-[800px]:py-[0.85rem] max-[800px]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] max-[800px]:shadow-[0_-12px_40px_oklch(0.08_0.04_280/0.4),inset_0_1px_0_var(--glass-highlight)] max-[800px]:backdrop-blur-[22px]">
-            <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[rgb(15_23_42/0.28)] px-[0.85rem] py-3" aria-label="口說練習">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <span className="text-[0.8125rem] font-[650] uppercase tracking-[0.04em] text-muted">
-                  口說練習
-                </span>
-                <span
-                  className={cn(
-                    "text-[0.8125rem] font-semibold text-secondary",
-                    (liveState === "listening" || oralStatusActive) &&
-                      "text-accent",
-                  )}
-                  aria-live="polite"
-                >
-                  {oralStatusLabel}
-                </span>
-              </div>
-              {pipelineMode && pipelineError ? (
-                <div role="alert">
-                  <p className="m-0 mb-2 text-[0.9rem] leading-normal text-danger">
-                    {pipelineError}
-                  </p>
-                  <p className="m-0 text-xs leading-snug text-muted">
-                    前綴 STT／Gemini／TTS 表示故障環節；請確認
-                    `VITE_GOOGLE_CLOUD_API_KEY` 權限（Speech-to-Text、Text-to-Speech）或
-                    `VITE_GEMINI_API_KEY`。
-                  </p>
-                </div>
-              ) : null}
-              {!pipelineMode && liveError ? (
-                <div role="alert">
-                  <p className="m-0 mb-2 text-[0.9rem] leading-normal text-danger">
-                    {liveError}
-                  </p>
-                  <p className="m-0 text-xs leading-snug text-muted">
-                    若訊息含 code／status，請複製全文並對照 Google AI Studio Live
-                    或專案 API 權限與配額。
-                  </p>
-                </div>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-[0.65rem]">
-                {pipelineMode ? (
-                  <>
-                    {pipelineState === "idle" || pipelineState === "error" ? (
-                      <MotionPressable
-                        type="button"
-                        className={quickTestBtn}
-                        onClick={() => {
-                          void startPipelineOral();
-                        }}
-                        disabled={isStreaming || isPipelineBusy}
-                      >
-                        開始錄音
-                      </MotionPressable>
-                    ) : null}
-                    {pipelineState === "recording" ? (
+                  {pipelineMode && pipelineError ? (
+                    <div role="alert">
+                      <p className="m-0 mb-2 text-[0.9rem] leading-normal text-danger">
+                        {pipelineError}
+                      </p>
+                      <p className="m-0 text-xs leading-snug text-muted">
+                        前綴 STT／Gemini／TTS 表示故障環節；請確認
+                        `VITE_GOOGLE_CLOUD_API_KEY`
+                        權限（Speech-to-Text、Text-to-Speech）或
+                        `VITE_GEMINI_API_KEY`。
+                      </p>
+                    </div>
+                  ) : null}
+                  {!pipelineMode && liveError ? (
+                    <div role="alert">
+                      <p className="m-0 mb-2 text-[0.9rem] leading-normal text-danger">
+                        {liveError}
+                      </p>
+                      <p className="m-0 text-xs leading-snug text-muted">
+                        若訊息含 code／status，請複製全文並對照 Google AI Studio
+                        Live 或專案 API 權限與配額。
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap items-center gap-[0.65rem]">
+                    {pipelineMode ? (
                       <>
-                        <MotionPressable
-                          type="button"
-                          className={quickTestBtn}
-                          onClick={() => {
-                            void stopPipelineAndSend();
-                          }}
-                          disabled={isStreaming}
-                        >
-                          停止並送出
-                        </MotionPressable>
-                        <MotionPressable
-                          type="button"
-                          className={quickTestBtn}
-                          onClick={() => {
-                            void cancelPipelineOral();
-                          }}
-                          disabled={isStreaming}
-                        >
-                          取消錄音
-                        </MotionPressable>
+                        {pipelineState === "idle" ||
+                        pipelineState === "error" ? (
+                          <MotionPressable
+                            type="button"
+                            className={quickTestBtn}
+                            onClick={() => {
+                              void startPipelineOral();
+                            }}
+                            disabled={isStreaming || isPipelineBusy}
+                          >
+                            開始錄音
+                          </MotionPressable>
+                        ) : null}
+                        {pipelineState === "recording" ? (
+                          <>
+                            <MotionPressable
+                              type="button"
+                              className={quickTestBtn}
+                              onClick={() => {
+                                void stopPipelineAndSend();
+                              }}
+                              disabled={isStreaming}
+                            >
+                              停止並送出
+                            </MotionPressable>
+                            <MotionPressable
+                              type="button"
+                              className={quickTestBtn}
+                              onClick={() => {
+                                void cancelPipelineOral();
+                              }}
+                              disabled={isStreaming}
+                            >
+                              取消錄音
+                            </MotionPressable>
+                          </>
+                        ) : null}
+                        {pipelineState === "transcribing" ||
+                        pipelineState === "replying" ||
+                        pipelineState === "speaking" ? (
+                          <MotionPressable
+                            type="button"
+                            className={quickTestBtn}
+                            onClick={() => {
+                              void cancelPipelineOral();
+                            }}
+                          >
+                            取消
+                          </MotionPressable>
+                        ) : null}
                       </>
-                    ) : null}
-                    {pipelineState === "transcribing" ||
-                    pipelineState === "replying" ||
-                    pipelineState === "speaking" ? (
+                    ) : liveState === "idle" || liveState === "connecting" ? (
                       <MotionPressable
                         type="button"
                         className={quickTestBtn}
                         onClick={() => {
-                          void cancelPipelineOral();
+                          void startLiveOral();
+                        }}
+                        disabled={isStreaming || liveState === "connecting"}
+                      >
+                        {liveState === "connecting" ? "連線中…" : "開始口說"}
+                      </MotionPressable>
+                    ) : (
+                      <MotionPressable
+                        type="button"
+                        className={quickTestBtn}
+                        onClick={() => {
+                          void stopLiveOral();
                         }}
                       >
-                        取消
+                        停止口說
                       </MotionPressable>
-                    ) : null}
-                  </>
-                ) : liveState === "idle" || liveState === "connecting" ? (
+                    )}
+                  </div>
+                </div>
+
+                <label className="sr-only" htmlFor="speaking-input">
+                  訊息
+                </label>
+                <textarea
+                  id="speaking-input"
+                  className="min-h-[88px] w-full resize-y rounded-xl border border-white/12 bg-[rgb(15_23_42/0.35)] px-[0.85rem] py-[0.65rem] font-inherit text-[0.9375rem] leading-normal text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onComposerKeyDown}
+                  placeholder="輸入訊息…"
+                  disabled={isStreaming || isLiveActive || isPipelineBusy}
+                  rows={3}
+                />
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {isStreaming && !isLiveActive ? (
+                    <span
+                      className="text-[0.8125rem] font-medium text-accent"
+                      aria-live="polite"
+                    >
+                      回覆中…
+                    </span>
+                  ) : null}
+                  {isStreaming && !isLiveActive ? (
+                    <MotionPressable
+                      type="button"
+                      className={quickTestBtn}
+                      onClick={cancelStream}
+                    >
+                      停止
+                    </MotionPressable>
+                  ) : null}
+                  {isLiveActive ? (
+                    <span
+                      className="text-[0.8125rem] font-medium text-accent"
+                      aria-live="polite"
+                    >
+                      Live 口說中，請停止口說後再打字送出。
+                    </span>
+                  ) : null}
+                  {pipelineMode && isPipelineBusy ? (
+                    <span
+                      className="text-[0.8125rem] font-medium text-accent"
+                      aria-live="polite"
+                    >
+                      語音管道處理中，請稍候或按「取消」；完成前無法打字送出。
+                    </span>
+                  ) : null}
                   <MotionPressable
-                    type="button"
+                    type="submit"
                     className={quickTestBtn}
-                    onClick={() => {
-                      void startLiveOral();
-                    }}
                     disabled={
-                      isStreaming || liveState === "connecting"
+                      isStreaming ||
+                      isLiveActive ||
+                      isPipelineBusy ||
+                      !input.trim()
                     }
                   >
-                    {liveState === "connecting" ? "連線中…" : "開始口說"}
+                    送出
                   </MotionPressable>
-                ) : (
-                  <MotionPressable
-                    type="button"
-                    className={quickTestBtn}
-                    onClick={() => {
-                      void stopLiveOral();
-                    }}
-                  >
-                    停止口說
-                  </MotionPressable>
-                )}
+                </div>
+              </div>
+            </form>
+          </GlassBentoCard>
+
+          <GlassBentoCard className="flex min-h-0 min-w-0 shrink-0 flex-col p-[clamp(1rem,2.5vw,1.25rem)]">
+            <div className="flex flex-col gap-4">
+              <div className="flex w-full max-w-md min-w-0 flex-col gap-[0.35rem]">
+                <label
+                  htmlFor="speaking-text-model-select"
+                  className="text-xs font-semibold uppercase tracking-[0.04em] text-muted"
+                >
+                  文字模型
+                </label>
+                <select
+                  id="speaking-text-model-select"
+                  className={cn(
+                    nativeGlassSelect,
+                    speakingLiveSelect,
+                    "inline-flex min-h-9 min-w-0 flex-1 max-w-none items-center",
+                  )}
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={isStreaming}
+                  aria-label="文字對話模型"
+                >
+                  {SPEAKING_TEXT_MODEL_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex w-full max-w-md min-w-0 flex-col gap-[0.35rem]">
+                <label
+                  htmlFor="speaking-oral-mode-select"
+                  className="text-xs font-semibold uppercase tracking-[0.04em] text-muted"
+                >
+                  口說模型
+                </label>
+                <select
+                  id="speaking-oral-mode-select"
+                  className={cn(
+                    nativeGlassSelect,
+                    speakingLiveSelect,
+                    "inline-flex min-h-9 min-w-0 flex-1 max-w-none items-center",
+                  )}
+                  value={liveModel}
+                  onChange={(e) => setLiveModel(e.target.value)}
+                  disabled={
+                    isLiveActive ||
+                    liveState === "connecting" ||
+                    isPipelineBusy
+                  }
+                  aria-label="口說模式（Live 或語音管道）"
+                >
+                  {ORAL_MODE_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-
-            <label className="sr-only" htmlFor="speaking-input">
-              訊息
-            </label>
-            <textarea
-              id="speaking-input"
-              className="min-h-[88px] w-full resize-y rounded-xl border border-white/12 bg-[rgb(15_23_42/0.35)] px-[0.85rem] py-[0.65rem] font-inherit text-[0.9375rem] leading-normal text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onComposerKeyDown}
-              placeholder="輸入訊息…"
-              disabled={isStreaming || isLiveActive || isPipelineBusy}
-              rows={3}
-            />
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              {isStreaming && !isLiveActive ? (
-                <span className="text-[0.8125rem] font-medium text-accent" aria-live="polite">
-                  回覆中…
-                </span>
-              ) : null}
-              {isStreaming && !isLiveActive ? (
-                <MotionPressable
-                  type="button"
-                  className={quickTestBtn}
-                  onClick={cancelStream}
-                >
-                  停止
-                </MotionPressable>
-              ) : null}
-              {isLiveActive ? (
-                <span className="text-[0.8125rem] font-medium text-accent" aria-live="polite">
-                  Live 口說中，請停止口說後再打字送出。
-                </span>
-              ) : null}
-              {pipelineMode && isPipelineBusy ? (
-                <span className="text-[0.8125rem] font-medium text-accent" aria-live="polite">
-                  語音管道處理中，請稍候或按「取消」；完成前無法打字送出。
-                </span>
-              ) : null}
-              <MotionPressable
-                type="submit"
-                className={quickTestBtn}
-                disabled={
-                  isStreaming || isLiveActive || isPipelineBusy || !input.trim()
-                }
-              >
-                送出
-              </MotionPressable>
-            </div>
-            </div>
-          </form>
-        </GlassBentoCard>
+          </GlassBentoCard>
+        </div>
       </div>
     </div>
   );

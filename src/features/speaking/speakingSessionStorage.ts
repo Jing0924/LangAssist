@@ -1,6 +1,7 @@
 import {
   DEFAULT_ORAL_MODE_ID,
   normalizeStoredLiveModelId,
+  normalizeStoredSpeakingTextModel,
 } from "./speakingDefaults";
 import type { ChatMessage, SpeakingSession } from "./types";
 
@@ -84,7 +85,7 @@ export function loadSpeakingSessions(): SpeakingSessionsStoredV1 | null {
         return {
           id: r.id,
           title,
-          model: r.model,
+          model: normalizeStoredSpeakingTextModel(r.model),
           liveModel: normalizeStoredLiveModelId(r.liveModel),
           messages: r.messages as ChatMessage[],
           updatedAt: r.updatedAt,

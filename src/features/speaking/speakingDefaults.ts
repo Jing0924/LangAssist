@@ -18,11 +18,23 @@ export const DEFAULT_ORAL_MODE_ID = PIPELINE_ORAL_MODE_ID;
 
 export type OralModeOption = { id: string; label: string };
 
+/** REST Gemini models offered for typed speaking chat (sidebar dropdown). */
+export const SPEAKING_TEXT_MODEL_OPTIONS: OralModeOption[] = [
+  {
+    id: DEFAULT_SPEAKING_MODEL,
+    label: "Gemini 2.5 Flash Lite",
+  },
+];
+
+const SPEAKING_TEXT_MODEL_IDS = new Set(
+  SPEAKING_TEXT_MODEL_OPTIONS.map((o) => o.id),
+);
+
 /** Gemini Live / native-audio options only (for docs and `isGeminiLiveOralMode`). */
 export const GEMINI_LIVE_ORAL_MODEL_OPTIONS: OralModeOption[] = [
   {
     id: "gemini-3.1-flash-live-preview",
-    label: "Gemini 3.1 Flash Live（預覽）",
+    label: "Gemini 3.1 Flash Live",
   },
 ];
 
@@ -54,5 +66,13 @@ export function normalizeStoredLiveModelId(id: unknown): string {
   if (typeof id !== "string" || !id.trim()) return DEFAULT_ORAL_MODE_ID;
   const t = id.trim();
   if (!ALL_ORAL_MODE_IDS.has(t)) return DEFAULT_ORAL_MODE_ID;
+  return t;
+}
+
+/** Coerce stored text chat model to a supported REST model id. */
+export function normalizeStoredSpeakingTextModel(id: unknown): string {
+  if (typeof id !== "string" || !id.trim()) return DEFAULT_SPEAKING_MODEL;
+  const t = id.trim();
+  if (!SPEAKING_TEXT_MODEL_IDS.has(t)) return DEFAULT_SPEAKING_MODEL;
   return t;
 }
