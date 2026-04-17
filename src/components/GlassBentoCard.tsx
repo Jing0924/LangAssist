@@ -1,6 +1,7 @@
 import { motion, type HTMLMotionProps } from "framer-motion";
 import type { ReactNode } from "react";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { cn } from "../lib/cn";
 
 type GlassBentoCardProps = {
   children: ReactNode;
@@ -16,7 +17,10 @@ export function GlassBentoCard({
 
   return (
     <motion.div
-      className={`glass-panel ${className}`.trim()}
+      className={cn(
+        "rounded-[20px] border border-white/10 bg-[var(--glass-bg)] shadow-[0_8px_32px_oklch(0.1_0.05_280/0.35),inset_0_1px_0_var(--glass-highlight)] backdrop-blur-xl max-sm:backdrop-blur-[22px]",
+        className,
+      )}
       whileHover={
         hoverLift
           ? {

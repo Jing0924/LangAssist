@@ -27,6 +27,13 @@ import { useSpeakingChat } from "../features/speaking/useSpeakingChat";
 import { useSpeakingSessionStore } from "../features/speaking/useSpeakingSessionStore";
 import type { SpeakingSession } from "../features/speaking/types";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { cn } from "../lib/cn";
+import {
+  assistantMarkdownProse,
+  nativeGlassSelect,
+  quickTestBtn,
+  speakingLiveSelect,
+} from "../lib/uiClasses";
 
 const NEAR_BOTTOM_PX = 80;
 const SPEAKING_GUIDE_STORAGE_KEY = "langassist-speaking-guide-open";
@@ -42,6 +49,7 @@ type SpeakingHistoryCardProps = {
   onDeleteSession: (id: string) => void;
   /** Called after mobile drawer should close (select / new chat) */
   onNavigateMobile?: () => void;
+  variant: "rail" | "drawer";
 };
 
 function SpeakingHistoryCard({
@@ -53,6 +61,7 @@ function SpeakingHistoryCard({
   onSelectSession,
   onDeleteSession,
   onNavigateMobile,
+  variant,
 }: SpeakingHistoryCardProps) {
   const wrapMobile = (fn: () => void) => {
     fn();
@@ -60,9 +69,18 @@ function SpeakingHistoryCard({
   };
 
   return (
-    <GlassBentoCard className="speaking-page__sidebar speaking-bento__sidebar-card">
-      <div className="speaking-page__sidebar-head">
-        <h3 className="speaking-page__sidebar-title">對話歷史</h3>
+    <GlassBentoCard
+      className={cn(
+        "flex min-h-0 flex-col gap-[0.65rem] p-[clamp(0.85rem,2vw,1.1rem)]",
+        variant === "rail" && "h-full w-full max-w-full flex-1 basis-[260px]",
+        variant === "drawer" &&
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain shadow-[8px_0_40px_oklch(0.08_0.04_280/0.35),inset_0_1px_0_var(--glass-highlight)]",
+      )}
+    >
+      <div className="flex flex-col gap-2">
+        <h3 className="m-0 text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-muted">
+          對話歷史
+        </h3>
         {newChatDisabled ? (
           <span id="speaking-new-chat-disabled-hint" className="sr-only">
             請先在此對話送出至少一則訊息，才能建立新對話。
@@ -70,7 +88,7 @@ function SpeakingHistoryCard({
         ) : null}
         <MotionPressable
           type="button"
-          className="speaking-page__btn-new"
+          className="cursor-pointer rounded-[10px] border border-white/[0.18] bg-sky-400/20 px-3 py-[0.45rem] text-center font-sans text-[0.8125rem] font-semibold text-foreground transition-[background,border-color] hover:border-white/25 hover:bg-sky-400/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
           onClick={() => wrapMobile(onNewChat)}
           disabled={newChatDisabled}
           title={
@@ -85,26 +103,38 @@ function SpeakingHistoryCard({
           新對話
         </MotionPressable>
       </div>
-      <p className="speaking-page__sessions-hint">僅在此裝置</p>
-      <ul className="speaking-page__session-list" role="list">
+      <p className="m-0 text-[0.7rem] leading-snug text-muted">僅在此裝置</p>
+      <ul
+        className="m-0 flex min-h-0 flex-1 list-none flex-col gap-[0.4rem] overflow-y-auto p-0"
+        role="list"
+      >
         {sessions.map((s) => {
           const isActive = s.id === activeId;
           const label = s.title ?? "新對話";
           return (
-            <li key={s.id} className="speaking-page__session-li">
+            <li key={s.id} className="m-0">
               <div
-                className={`speaking-page__session-item${isActive ? " speaking-page__session-item--active" : ""}`}
+                className={cn(
+                  "flex items-stretch gap-[0.35rem] rounded-[10px] border border-transparent bg-white/[0.04] transition-[border-color,background]",
+                  isActive &&
+                    "border-sky-400/45 bg-sky-400/15",
+                )}
               >
                 <MotionPressable
                   type="button"
-                  className="speaking-page__session-select"
+                  className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer flex-col items-start justify-center gap-0.5 rounded-[10px] border-0 bg-transparent px-[0.85rem] py-3 text-left font-inherit text-inherit transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                   onClick={() => wrapMobile(() => onSelectSession(s.id))}
                 >
-                  <span className="speaking-page__session-title">
+                  <span
+                    className={cn(
+                      "line-clamp-2 text-[0.8125rem] font-semibold leading-snug text-secondary",
+                      isActive && "text-foreground",
+                    )}
+                  >
                     {label}
                   </span>
                   <time
-                    className="speaking-page__session-time"
+                    className="text-[0.68rem] font-medium text-muted"
                     dateTime={new Date(s.updatedAt).toISOString()}
                   >
                     {dateFmt.format(s.updatedAt)}
@@ -112,7 +142,7 @@ function SpeakingHistoryCard({
                 </MotionPressable>
                 <MotionPressable
                   type="button"
-                  className="speaking-page__session-delete"
+                  className="min-w-[2.75rem] shrink-0 cursor-pointer self-stretch rounded-lg border-0 bg-red-400/15 px-2 font-sans text-[0.65rem] font-semibold tracking-[0.03em] text-danger transition-colors hover:bg-red-400/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                   onClick={(e) => {
                     e.stopPropagation();
                     wrapMobile(() => onDeleteSession(s.id));
@@ -407,33 +437,35 @@ export default function SpeakingPracticePage() {
   }, [historyDrawerOpen]);
 
   return (
-    <div className="speaking-page">
-      <GlassBentoCard className="glass-panel--header speaking-page__toolbar">
-        <div className="speaking-page__intro">
-          <h2 className="speaking-page__title">會話練習</h2>
-          <p className="speaking-page__subtitle">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <GlassBentoCard className="flex flex-wrap items-start justify-between gap-4 rounded-[18px] px-5 py-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-[0.35rem]">
+          <h2 className="m-0 text-[1.1rem] font-semibold tracking-tight text-foreground">
+            會話練習
+          </h2>
+          <p className="m-0 max-w-[56ch] text-[0.8125rem] leading-snug text-muted max-[800px]:hidden">
             用文字與助手對話練習，必要時搭配麥克風即時或錄音回覆，在同一畫面完成輸入與口說。
           </p>
         </div>
-        <div className="speaking-page__toolbar-actions">
+        <div className="flex shrink-0 flex-wrap items-start justify-end gap-x-2 gap-y-2">
           {!isDesktop ? (
             <MotionPressable
               ref={historyTriggerRef}
               type="button"
-              className="speaking-page__btn-history"
+              className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-[0.35rem] rounded-[10px] border border-white/[0.16] bg-white/[0.07] px-[0.85rem] py-[0.45rem] font-sans text-[0.8125rem] font-semibold text-foreground transition-[background,border-color] hover:border-white/25 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               onClick={() => setHistoryOpen((v) => !v)}
               aria-expanded={historyDrawerOpen}
               aria-controls={SPEAKING_HISTORY_PANEL_ID}
               aria-label="對話歷史"
               title="對話歷史"
             >
-              <History size={18} aria-hidden className="speaking-page__btn-history-icon" />
-              <span className="speaking-page__btn-history-label">歷史</span>
+              <History size={18} aria-hidden className="shrink-0 opacity-90" />
+              <span>歷史</span>
             </MotionPressable>
           ) : null}
           <MotionPressable
             type="button"
-            className="speaking-page__btn-guide"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 self-start rounded-[10px] border border-sky-400/35 bg-transparent px-[0.95rem] py-[0.45rem] font-sans text-[0.8125rem] font-semibold text-accent transition-[background,border-color] hover:border-sky-400/55 hover:bg-sky-400/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-[800px]:gap-1"
             onClick={toggleGuide}
             aria-expanded={guideExpanded}
             aria-controls={SPEAKING_GUIDE_PANEL_ID}
@@ -442,18 +474,18 @@ export default function SpeakingPracticePage() {
             <Settings2
               size={18}
               aria-hidden
-              className="speaking-page__btn-guide-icon"
+              className="hidden shrink-0 max-[800px]:inline-flex"
             />
-            <span className="speaking-page__btn-guide-label speaking-page__btn-guide-label--full">
+            <span className="max-[800px]:sr-only">
               {guideExpanded ? "收合說明" : "設定與說明"}
             </span>
-            <span className="speaking-page__btn-guide-label speaking-page__btn-guide-label--short">
+            <span className="hidden max-[800px]:inline">
               {guideExpanded ? "收合" : "說明"}
             </span>
           </MotionPressable>
           <MotionPressable
             type="button"
-            className="speaking-page__btn-clear"
+            className="shrink-0 cursor-pointer self-start rounded-[10px] border border-white/[0.16] bg-white/[0.06] px-[0.95rem] py-[0.45rem] font-sans text-[0.8125rem] font-semibold text-secondary transition-[background,border-color,color] hover:border-white/25 hover:bg-white/[0.09] hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
             onClick={() => {
               void clearConversationAll();
             }}
@@ -465,14 +497,17 @@ export default function SpeakingPracticePage() {
       </GlassBentoCard>
 
       {guideExpanded ? (
-        <GlassBentoCard className="speaking-page__guide-wrap">
+        <GlassBentoCard className="max-h-[min(62vh,520px)] self-stretch overflow-y-auto rounded-[18px] px-[clamp(1rem,2.2vw,1.35rem)] py-[clamp(0.9rem,2vw,1.15rem)]">
           <SpeakingGuidePanel id={SPEAKING_GUIDE_PANEL_ID} />
         </GlassBentoCard>
       ) : null}
 
-      <div className="speaking-bento">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 content-stretch min-[801px]:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] min-[801px]:items-stretch">
         {isDesktop ? (
-          <aside className="speaking-bento__aside" aria-label="對話歷史">
+          <aside
+            className="flex min-h-0 min-w-0 flex-col min-[801px]:contents"
+            aria-label="對話歷史"
+          >
             <SpeakingHistoryCard
               sessions={sessions}
               activeId={activeId}
@@ -481,6 +516,7 @@ export default function SpeakingPracticePage() {
               onNewChat={onNewChat}
               onSelectSession={onSelectSession}
               onDeleteSession={onDeleteSession}
+              variant="rail"
             />
           </aside>
         ) : null}
@@ -490,7 +526,7 @@ export default function SpeakingPracticePage() {
             {historyDrawerOpen ? (
               <button
                 type="button"
-                className="speaking-drawer__backdrop"
+                className="fixed inset-0 z-[120] cursor-pointer border-0 bg-[oklch(0.08_0.04_280/0.55)] p-0 backdrop-blur-sm"
                 aria-label="關閉對話歷史"
                 onClick={closeHistory}
               />
@@ -498,7 +534,11 @@ export default function SpeakingPracticePage() {
             <div
               ref={drawerPanelRef}
               id={SPEAKING_HISTORY_PANEL_ID}
-              className={`speaking-drawer${historyDrawerOpen ? " speaking-drawer--open" : ""}`}
+              className={cn(
+                "pointer-events-none fixed top-0 bottom-0 left-0 z-[125] flex min-h-0 w-[min(90vw,320px)] -translate-x-[102%] flex-col px-[0.85rem] py-[0.65rem] pb-[calc(0.65rem+env(safe-area-inset-bottom,0px))] pl-[0.85rem] pr-[0.65rem] transition-[transform,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] invisible",
+                historyDrawerOpen &&
+                  "pointer-events-auto translate-x-0 visible",
+              )}
               role="dialog"
               aria-modal="true"
               aria-hidden={!historyDrawerOpen}
@@ -514,13 +554,14 @@ export default function SpeakingPracticePage() {
                 onSelectSession={onSelectSession}
                 onDeleteSession={onDeleteSession}
                 onNavigateMobile={closeHistory}
+                variant="drawer"
               />
             </div>
           </>
         ) : null}
 
         <GlassBentoCard
-          className="speaking-page__panel"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-[clamp(1rem,2.5vw,1.25rem)]"
           aria-labelledby="speaking-heading"
         >
           <h2 id="speaking-heading" className="sr-only">
@@ -528,28 +569,28 @@ export default function SpeakingPracticePage() {
           </h2>
 
           {error ? (
-            <p className="speaking-page__error" role="alert">
+            <p className="m-0 text-[0.9rem] leading-normal text-danger" role="alert">
               {error}
             </p>
           ) : null}
 
           <section
-            className="chat-thread speaking-page__thread"
+            className="flex min-h-[220px] max-h-[min(52vh,480px)] flex-1 flex-col overflow-hidden p-0"
             aria-label="會話練習對話"
           >
             <div
               ref={threadInnerRef}
-              className="chat-thread__inner"
+              className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-[1.1rem] pt-4"
               onScroll={onThreadScroll}
             >
               {messages.length === 0 ? (
-                <div className="speaking-page__empty speaking-page__empty--cta">
-                  <p className="speaking-page__empty-text">
+                <div className="m-0 flex flex-col items-start gap-[0.65rem] text-[0.875rem] leading-normal text-muted">
+                  <p className="m-0">
                     輸入訊息或開始口說練習即可開場。
                   </p>
                   <MotionPressable
                     type="button"
-                    className="speaking-guide__trigger-link"
+                    className="cursor-pointer self-start border-0 bg-transparent p-0 font-inherit text-[0.8125rem] font-semibold text-accent underline decoration-accent underline-offset-[0.15em] hover:text-foreground focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     onClick={openGuide}
                     aria-expanded={guideExpanded}
                     aria-controls={SPEAKING_GUIDE_PANEL_ID}
@@ -571,20 +612,36 @@ export default function SpeakingPracticePage() {
                 return (
                   <div
                     key={m.id}
-                    className={`bubble-row ${isUser ? "bubble-row--out" : "bubble-row--in"}`}
+                    className={cn(
+                      "flex w-full",
+                      isUser ? "justify-end" : "justify-start",
+                    )}
                   >
                     <article
-                      className={`bubble ${isUser ? "bubble--out" : "bubble--in"}`}
+                      className={cn(
+                        "relative max-w-[min(92%,560px)] rounded-[20px] px-[0.85rem] pb-3 pt-[0.65rem] shadow-[0_6px_28px_rgba(0,0,0,0.22)] max-[540px]:max-w-full",
+                        isUser
+                          ? "ml-8 rounded-br-md border border-[oklch(0.82_0.14_200/0.35)] bg-[linear-gradient(155deg,oklch(0.82_0.14_200/0.2)_0%,oklch(0.22_0.06_270/0.55)_100%)] max-[540px]:ml-2"
+                          : "mr-8 rounded-bl-md border border-white/12 bg-[linear-gradient(155deg,oklch(0.92_0.02_260/0.12)_0%,oklch(0.2_0.05_270/0.68)_100%)] max-[540px]:mr-2",
+                      )}
                     >
-                      <header className="bubble__meta">
-                        <span className="bubble__name">
+                      <header className="mb-[0.35rem] flex items-baseline justify-between gap-2">
+                        <span
+                          className={cn(
+                            "text-[0.72rem] font-bold uppercase tracking-[0.06em] text-muted",
+                            isUser && "text-cyan-400/85",
+                          )}
+                        >
                           {isUser
                             ? "你"
                             : "助手"}
                         </span>
                       </header>
                       <div
-                        className={`bubble__body ${!isUser ? "bubble__body--translation bubble__body--md" : ""}`}
+                        className={cn(
+                          "break-words text-[1.02rem] leading-relaxed",
+                          isUser ? "text-foreground" : `text-secondary ${assistantMarkdownProse}`,
+                        )}
                       >
                         {m.content ? (
                           isUser ? (
@@ -593,12 +650,18 @@ export default function SpeakingPracticePage() {
                             <AssistantMarkdown content={m.content} />
                           )
                         ) : showCaret ? (
-                          <span className="stream-caret" aria-hidden="true" />
+                          <span
+                            className="inline-block h-[1em] w-0.5 animate-caret-blink rounded-sm bg-current align-[-0.12em] opacity-55"
+                            aria-hidden="true"
+                          />
                         ) : (
-                          <span className="bubble__placeholder">…</span>
+                          <span className="text-[0.9375rem] text-muted">…</span>
                         )}
                         {m.content && showCaret ? (
-                          <span className="stream-caret" aria-hidden="true" />
+                          <span
+                            className="inline-block h-[1em] w-0.5 animate-caret-blink rounded-sm bg-current align-[-0.12em] opacity-55"
+                            aria-hidden="true"
+                          />
                         ) : null}
                       </div>
                     </article>
@@ -608,26 +671,30 @@ export default function SpeakingPracticePage() {
             </div>
           </section>
 
-          <form className="speaking-page__composer" onSubmit={onSubmit}>
-            <div className="speaking-page__models-row">
-              <label className="speaking-page__model-label">
-                <span className="speaking-page__model-label-text">
+          <form className="flex shrink-0 flex-col gap-3" onSubmit={onSubmit}>
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
+              <label className="flex min-w-0 flex-col gap-[0.35rem]">
+                <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted">
                   文字模型
                 </span>
                 <output
-                  className="speaking-page__model-input"
+                  className="inline-flex max-w-md min-h-9 items-center text-ellipsis whitespace-nowrap rounded-[10px] border border-white/12 bg-[rgb(15_23_42/0.35)] px-3 py-2 font-sans text-sm font-medium text-foreground"
                   aria-live="polite"
                 >
                   {model}
                 </output>
               </label>
-              <div className="speaking-page__oral-mode-field">
-                <label className="speaking-page__model-label">
-                  <span className="speaking-page__model-label-text">
+              <div className="flex min-w-0 flex-wrap items-end gap-x-2 gap-y-2">
+                <label className="flex min-w-[min(100%,12rem)] flex-1 flex-col gap-[0.35rem]">
+                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted">
                     口說模式
                   </span>
                   <select
-                    className="speaking-page__model-input speaking-page__model-input--live-select"
+                    className={cn(
+                      nativeGlassSelect,
+                      speakingLiveSelect,
+                      "inline-flex min-h-9 w-full max-w-none items-center",
+                    )}
                     value={liveModel}
                     onChange={(e) => setLiveModel(e.target.value)}
                     disabled={
@@ -646,7 +713,7 @@ export default function SpeakingPracticePage() {
                 </label>
                 <MotionPressable
                   type="button"
-                  className="speaking-page__oral-mode-help"
+                  className="mb-[0.05rem] shrink-0 cursor-pointer rounded-lg border border-white/[0.14] bg-white/[0.05] px-[0.65rem] py-[0.35rem] font-sans text-xs font-semibold text-secondary transition-[background,border-color,color] hover:border-sky-400/40 hover:bg-sky-400/15 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   onClick={openGuideToOralSection}
                   aria-expanded={guideExpanded}
                   aria-controls={SPEAKING_GUIDE_PANEL_ID}
@@ -657,21 +724,29 @@ export default function SpeakingPracticePage() {
               </div>
             </div>
 
-            <div className="speaking-page__thumb-zone">
-            <div className="speaking-page__oral" aria-label="口說練習">
-              <div className="speaking-page__oral-head">
-                <span className="speaking-page__oral-title">口說練習</span>
+            <div className="flex flex-col gap-3 max-[800px]:sticky max-[800px]:bottom-0 max-[800px]:z-20 max-[800px]:-mx-[clamp(1rem,2.5vw,1.25rem)] max-[800px]:mt-auto max-[800px]:mb-[calc(-1*clamp(1rem,2.5vw,1.25rem))] max-[800px]:rounded-t-[18px] max-[800px]:border max-[800px]:border-white/10 max-[800px]:bg-[oklch(0.17_0.055_275/0.82)] max-[800px]:px-[clamp(1rem,2.5vw,1.25rem)] max-[800px]:py-[0.85rem] max-[800px]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] max-[800px]:shadow-[0_-12px_40px_oklch(0.08_0.04_280/0.4),inset_0_1px_0_var(--glass-highlight)] max-[800px]:backdrop-blur-[22px]">
+            <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[rgb(15_23_42/0.28)] px-[0.85rem] py-3" aria-label="口說練習">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <span className="text-[0.8125rem] font-[650] uppercase tracking-[0.04em] text-muted">
+                  口說練習
+                </span>
                 <span
-                  className={`speaking-page__oral-status${liveState === "listening" || oralStatusActive ? " speaking-page__oral-status--live" : ""}`}
+                  className={cn(
+                    "text-[0.8125rem] font-semibold text-secondary",
+                    (liveState === "listening" || oralStatusActive) &&
+                      "text-accent",
+                  )}
                   aria-live="polite"
                 >
                   {oralStatusLabel}
                 </span>
               </div>
               {pipelineMode && pipelineError ? (
-                <div className="speaking-page__live-error" role="alert">
-                  <p className="speaking-page__error">{pipelineError}</p>
-                  <p className="speaking-page__error-hint">
+                <div role="alert">
+                  <p className="m-0 mb-2 text-[0.9rem] leading-normal text-danger">
+                    {pipelineError}
+                  </p>
+                  <p className="m-0 text-xs leading-snug text-muted">
                     前綴 STT／Gemini／TTS 表示故障環節；請確認
                     `VITE_GOOGLE_CLOUD_API_KEY` 權限（Speech-to-Text、Text-to-Speech）或
                     `VITE_GEMINI_API_KEY`。
@@ -679,21 +754,23 @@ export default function SpeakingPracticePage() {
                 </div>
               ) : null}
               {!pipelineMode && liveError ? (
-                <div className="speaking-page__live-error" role="alert">
-                  <p className="speaking-page__error">{liveError}</p>
-                  <p className="speaking-page__error-hint">
+                <div role="alert">
+                  <p className="m-0 mb-2 text-[0.9rem] leading-normal text-danger">
+                    {liveError}
+                  </p>
+                  <p className="m-0 text-xs leading-snug text-muted">
                     若訊息含 code／status，請複製全文並對照 Google AI Studio Live
                     或專案 API 權限與配額。
                   </p>
                 </div>
               ) : null}
-              <div className="speaking-page__oral-actions">
+              <div className="flex flex-wrap items-center gap-[0.65rem]">
                 {pipelineMode ? (
                   <>
                     {pipelineState === "idle" || pipelineState === "error" ? (
                       <MotionPressable
                         type="button"
-                        className="quick-test__btn"
+                        className={quickTestBtn}
                         onClick={() => {
                           void startPipelineOral();
                         }}
@@ -706,7 +783,7 @@ export default function SpeakingPracticePage() {
                       <>
                         <MotionPressable
                           type="button"
-                          className="quick-test__btn news-card__btn--stop"
+                          className={quickTestBtn}
                           onClick={() => {
                             void stopPipelineAndSend();
                           }}
@@ -716,7 +793,7 @@ export default function SpeakingPracticePage() {
                         </MotionPressable>
                         <MotionPressable
                           type="button"
-                          className="quick-test__btn"
+                          className={quickTestBtn}
                           onClick={() => {
                             void cancelPipelineOral();
                           }}
@@ -731,7 +808,7 @@ export default function SpeakingPracticePage() {
                     pipelineState === "speaking" ? (
                       <MotionPressable
                         type="button"
-                        className="quick-test__btn news-card__btn--stop"
+                        className={quickTestBtn}
                         onClick={() => {
                           void cancelPipelineOral();
                         }}
@@ -743,7 +820,7 @@ export default function SpeakingPracticePage() {
                 ) : liveState === "idle" || liveState === "connecting" ? (
                   <MotionPressable
                     type="button"
-                    className="quick-test__btn"
+                    className={quickTestBtn}
                     onClick={() => {
                       void startLiveOral();
                     }}
@@ -756,7 +833,7 @@ export default function SpeakingPracticePage() {
                 ) : (
                   <MotionPressable
                     type="button"
-                    className="quick-test__btn news-card__btn--stop"
+                    className={quickTestBtn}
                     onClick={() => {
                       void stopLiveOral();
                     }}
@@ -772,7 +849,7 @@ export default function SpeakingPracticePage() {
             </label>
             <textarea
               id="speaking-input"
-              className="speaking-page__textarea"
+              className="min-h-[88px] w-full resize-y rounded-xl border border-white/12 bg-[rgb(15_23_42/0.35)] px-[0.85rem] py-[0.65rem] font-inherit text-[0.9375rem] leading-normal text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onComposerKeyDown}
@@ -781,34 +858,34 @@ export default function SpeakingPracticePage() {
               rows={3}
             />
 
-            <div className="speaking-page__actions">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               {isStreaming && !isLiveActive ? (
-                <span className="speaking-page__streaming" aria-live="polite">
+                <span className="text-[0.8125rem] font-medium text-accent" aria-live="polite">
                   回覆中…
                 </span>
               ) : null}
               {isStreaming && !isLiveActive ? (
                 <MotionPressable
                   type="button"
-                  className="quick-test__btn news-card__btn--stop"
+                  className={quickTestBtn}
                   onClick={cancelStream}
                 >
                   停止
                 </MotionPressable>
               ) : null}
               {isLiveActive ? (
-                <span className="speaking-page__streaming" aria-live="polite">
+                <span className="text-[0.8125rem] font-medium text-accent" aria-live="polite">
                   Live 口說中，請停止口說後再打字送出。
                 </span>
               ) : null}
               {pipelineMode && isPipelineBusy ? (
-                <span className="speaking-page__streaming" aria-live="polite">
+                <span className="text-[0.8125rem] font-medium text-accent" aria-live="polite">
                   語音管道處理中，請稍候或按「取消」；完成前無法打字送出。
                 </span>
               ) : null}
               <MotionPressable
                 type="submit"
-                className="quick-test__btn"
+                className={quickTestBtn}
                 disabled={
                   isStreaming || isLiveActive || isPipelineBusy || !input.trim()
                 }

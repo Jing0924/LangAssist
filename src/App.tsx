@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -9,11 +9,28 @@ import {
 } from 'react-router-dom'
 import { GlassBentoCard } from './components/GlassBentoCard'
 import { TopNav } from './components/TopNav'
-import SpeakingPracticePage from './pages/SpeakingPracticePage'
-import VoiceTranslatePage from './pages/VoiceTranslatePage'
-import './App.css'
+
+const VoiceTranslatePage = lazy(() => import('./pages/VoiceTranslatePage'))
+const SpeakingPracticePage = lazy(() => import('./pages/SpeakingPracticePage'))
 
 const ROUTE_ANIM_ORDER = ['/voice', '/speaking'] as const
+
+function RoutePageFallback() {
+  return (
+    <div
+      className="flex min-h-[min(60vh,520px)] min-h-0 flex-1 flex-col items-center justify-center"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">載入頁面中</span>
+      <div
+        className="relative h-[3px] w-[min(240px,40vw)] overflow-hidden rounded-full bg-[oklch(0.85_0.02_275/0.22)] after:absolute after:inset-0 after:animate-route-shimmer after:bg-[linear-gradient(90deg,transparent,oklch(0.92_0.04_210/0.5),transparent)] motion-reduce:after:animate-none motion-reduce:after:opacity-45"
+        aria-hidden
+      />
+    </div>
+  )
+}
 
 function navDirection(from: string, to: string): number {
   const i0 = ROUTE_ANIM_ORDER.indexOf(
@@ -56,14 +73,16 @@ function AnimatedRoutes() {
           path="/voice"
           element={
             <motion.div
-              className="route-page"
+              className="flex min-h-0 flex-1 flex-col"
               variants={variants}
               initial="initial"
               animate="animate"
               exit="exit"
               transition={{ type: 'spring', stiffness: 400, damping: 34 }}
             >
-              <VoiceTranslatePage />
+              <Suspense fallback={<RoutePageFallback />}>
+                <VoiceTranslatePage />
+              </Suspense>
             </motion.div>
           }
         />
@@ -72,14 +91,16 @@ function AnimatedRoutes() {
           path="/speaking"
           element={
             <motion.div
-              className="route-page"
+              className="flex min-h-0 flex-1 flex-col"
               variants={variants}
               initial="initial"
               animate="animate"
               exit="exit"
               transition={{ type: 'spring', stiffness: 400, damping: 34 }}
             >
-              <SpeakingPracticePage />
+              <Suspense fallback={<RoutePageFallback />}>
+                <SpeakingPracticePage />
+              </Suspense>
             </motion.div>
           }
         />
@@ -96,17 +117,32 @@ function AppShell() {
   }, [])
 
   return (
-    <div className="app-shell">
-      <div className="app-bg" aria-hidden="true">
-        <div className="app-bg__orb app-bg__orb--a" />
-        <div className="app-bg__orb app-bg__orb--b" />
-        <div className="app-bg__orb app-bg__orb--c" />
+    <div className="relative min-h-svh overflow-x-hidden">
+      <div
+        className="fixed inset-0 z-0 bg-[linear-gradient(125deg,oklch(0.05_0.055_275)_0%,oklch(0.1_0.1_295)_38%,oklch(0.075_0.07_250)_68%,oklch(0.04_0.05_265)_100%)]"
+        aria-hidden="true"
+      >
+        <div
+          className="absolute -right-[8%] -top-[12%] size-[min(72vw,520px)] animate-float-a rounded-full bg-[radial-gradient(circle,oklch(0.78_0.16_210)_0%,oklch(0.6_0.12_240/0.45)_40%,transparent_68%)] blur-[64px] opacity-[0.65] pointer-events-none"
+          aria-hidden
+        />
+        <div
+          className="absolute -left-[18%] -bottom-[20%] size-[min(85vw,600px)] animate-float-b rounded-full bg-[radial-gradient(circle,oklch(0.62_0.26_305)_0%,oklch(0.45_0.15_300/0.4)_42%,transparent_65%)] blur-[64px] opacity-[0.65] pointer-events-none"
+          aria-hidden
+        />
+        <div
+          className="absolute top-[38%] left-[28%] size-[min(50vw,380px)] animate-float-c rounded-full bg-[radial-gradient(circle,oklch(0.72_0.14_200)_0%,oklch(0.55_0.1_220/0.35)_45%,transparent_70%)] blur-[64px] opacity-[0.35] pointer-events-none"
+          aria-hidden
+        />
       </div>
 
-      <div className="app-layout">
-        <GlassBentoCard className="glass-panel--header site-header">
-          <div className="brand">
-            <span className="brand__mark" aria-hidden="true">
+      <div className="relative z-[1] mx-auto flex min-h-svh max-w-[min(1240px,calc(100%-2rem))] flex-col gap-5 px-[clamp(1.25rem,4vw,2.25rem)] py-[clamp(1.25rem,4vw,2.25rem)] max-sm:gap-4 max-sm:px-[clamp(0.85rem,3vw,1.35rem)] max-sm:pb-[1.35rem] max-sm:pt-4">
+        <GlassBentoCard className="flex flex-wrap items-center justify-between gap-4 gap-x-6 rounded-[18px] px-5 py-4 max-sm:sticky max-sm:top-0 max-sm:z-[60]">
+          <div className="flex items-center gap-[0.85rem] text-left max-sm:gap-[0.65rem]">
+            <span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-white/12 bg-white/[0.06] text-accent max-sm:h-10 max-sm:w-10 max-sm:rounded-xl [&_svg]:max-sm:h-[22px] [&_svg]:max-sm:w-[22px]"
+              aria-hidden="true"
+            >
               <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
                 <circle
                   cx="16"
@@ -126,8 +162,12 @@ function AppShell() {
               </svg>
             </span>
             <div>
-              <h1 className="brand__title">LangAssist</h1>
-              <p className="brand__tagline">語言輔助 · VoiceTranslate</p>
+              <h1 className="m-0 text-[1.35rem] font-semibold tracking-tight text-foreground max-sm:text-[1.05rem]">
+                LangAssist
+              </h1>
+              <p className="mt-0.5 m-0 text-sm font-normal text-muted max-sm:hidden">
+                語言輔助 · VoiceTranslate
+              </p>
             </div>
           </div>
           <TopNav />
