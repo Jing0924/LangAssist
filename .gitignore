@@ -31,3 +31,6 @@ credentials/*.json
 
 # Local Netlify folder
 .netlify
+
+# cursor rules
+.cursor*
