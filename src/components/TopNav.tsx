@@ -1,9 +1,10 @@
-import { MessageSquareText, Mic } from "lucide-react";
+import { BookOpen, MessageSquareText, Mic } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../lib/cn";
 
 const links = [
   { to: "/voice", label: "即時翻譯", short: "翻譯", Icon: Mic },
+  { to: "/vocabulary", label: "單字學習", short: "單字", Icon: BookOpen },
   { to: "/speaking", label: "會話練習", short: "會話", Icon: MessageSquareText },
 ] as const;
 

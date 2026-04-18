@@ -11,9 +11,10 @@ import { GlassBentoCard } from './components/GlassBentoCard'
 import { TopNav } from './components/TopNav'
 
 const VoiceTranslatePage = lazy(() => import('./pages/VoiceTranslatePage'))
+const VocabularyPage = lazy(() => import('./pages/VocabularyPage'))
 const SpeakingPracticePage = lazy(() => import('./pages/SpeakingPracticePage'))
 
-const ROUTE_ANIM_ORDER = ['/voice', '/speaking'] as const
+const ROUTE_ANIM_ORDER = ['/voice', '/vocabulary', '/speaking'] as const
 
 function RoutePageFallback() {
   return (
@@ -86,7 +87,23 @@ function AnimatedRoutes() {
             </motion.div>
           }
         />
-        <Route path="/vocabulary" element={<Navigate to="/voice" replace />} />
+        <Route
+          path="/vocabulary"
+          element={
+            <motion.div
+              className="flex min-h-0 flex-1 flex-col"
+              variants={variants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+            >
+              <Suspense fallback={<RoutePageFallback />}>
+                <VocabularyPage />
+              </Suspense>
+            </motion.div>
+          }
+        />
         <Route
           path="/speaking"
           element={
